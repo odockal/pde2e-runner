@@ -64,10 +64,11 @@ if (Test-Path -Path "podman-desktop") {
     write-host "Checking out" $repositoryURL
     git clone $repositoryURL
     write-host "checking out into podman-desktop"
-    cd podman-desktop
-    write-host "checking out branch: $branch"
-    git checkout $branch
 }
+
+cd podman-desktop
+write-host "checking out branch: $branch"
+git checkout $branch
 
 # Set PDOMAN_DESKTOP_BINARY if exists
 if($podman_desktop_binary) {
