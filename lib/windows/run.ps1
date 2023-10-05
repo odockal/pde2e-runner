@@ -11,6 +11,8 @@ param(
     [string]$fork = "containers",
     [Parameter(HelpMessage = 'Branch')]
     [string]$branch = "main"
+    [Parameter(HelpMessage = 'Npm Target to run')]
+    [string]$npmTarget = "test:e2e:smoke"
 )
 
 function Download-PD {
@@ -33,18 +35,18 @@ mkdir $resultsFolder
 $workingDir=Get-Location
 write-host "Working location: " $workingDir
 
-$podman_desktop_binary=""
+$podmanDesktopBinary=""
 
 if (!$pdPath)
 {
     if ($pdUrl) {
         # set binary path
         Download-PD
-        $podman_desktop_binary="$workingDir\pd.exe"
+        $podmanDesktopBinary="$workingDir\pd.exe"
     }
 } else {
     # set podman desktop binary path
-    $podman_desktop_binary=$pdPath
+    $podmanDesktopBinary=$pdPath
 }
 
 # verify node, npm, yarn installation
@@ -71,20 +73,19 @@ write-host "checking out branch: $branch"
 git checkout $branch
 
 # Set PDOMAN_DESKTOP_BINARY if exists
-if($podman_desktop_binary) {
-    $env:PODMAN_DESKTOP_BINARY="$podman_desktop_binary";
+if($podmanDesktopBinary) {
+    $env:PODMAN_DESKTOP_BINARY="$podmanDesktopBinary";
 }
 
 ## YARN INSTALL AND TEST PART
 write-host "Installing dependencies"
 yarn install
-write-host "Running the e2e playwright tests using, can use Binary: $env:PODMAN_DESKTOP_BINARY"
-yarn test:e2e:smoke
+write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
+yarn $npmTarget
 
 ## Collect results
 write-host "Collecting the results into: " "$workingDir\$resultsFolder\"
 
 cp -r $workingDir\podman-desktop\tests\output\* $workingDir\$resultsFolder\
 
-start-sleep -Seconds 10
 write-host "Script finished..."
