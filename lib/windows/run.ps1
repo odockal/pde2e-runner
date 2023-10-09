@@ -10,7 +10,7 @@ param(
     [Parameter(HelpMessage = 'Fork')]
     [string]$fork = "containers",
     [Parameter(HelpMessage = 'Branch')]
-    [string]$branch = "main"
+    [string]$branch = "main",
     [Parameter(HelpMessage = 'Npm Target to run')]
     [string]$npmTarget = "test:e2e:smoke"
 )
