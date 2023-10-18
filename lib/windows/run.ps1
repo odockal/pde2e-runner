@@ -147,6 +147,9 @@ if($podmanDesktopBinary) {
     $env:PODMAN_DESKTOP_BINARY="$podmanDesktopBinary";
 }
 
+# Setup CI env. var.
+$env:CI = $true
+
 ## YARN INSTALL AND TEST PART
 write-host "Installing dependencies"
 yarn install
