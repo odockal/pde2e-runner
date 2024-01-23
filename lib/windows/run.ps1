@@ -20,7 +20,9 @@ param(
     [Parameter(HelpMessage = 'Start Podman machine, default is 0/false')]
     $start='1',
     [Parameter(HelpMessage = 'Podman machine rootful flag, default 0/false')]
-    $rootful='0'
+    $rootful='0',
+    [Parameter(HelpMessage = 'Podman machine user-mode-networking flag, default 0/false')]
+    $userNetworking='0'
 )
 
 function Download-PD {
@@ -104,8 +106,11 @@ if (-not (Command-Exists "podman")) {
 # Setup podman machine in the host system
 if ($initialize -eq "1") {
     $flags=''
-    if ($rootful -eq "1") {
+    if ($rootful -eq "1" -And $userNetworking -eq "0") {
         $flags="--rootful"
+    }
+    if ($rootful -eq "1" -And $userNetworking -eq "1") {
+        $flags="--rootful --user-mode-networking"
     }
     write-host "Initializing podman machine, command: podman machine init $flags"
     $logFile = "$workingDir\$resultsFolder\podman-machine-init.log"
