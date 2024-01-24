@@ -105,20 +105,22 @@ if (-not (Command-Exists "podman")) {
 
 # Setup podman machine in the host system
 if ($initialize -eq "1") {
-    $flags=''
-    if ($rootful -eq "1" -And $userNetworking -eq "0") {
-        $flags="--rootful"
+    $flags = ""
+    if ($rootful -eq "1") {
+        $flags += "--rootful "
     }
-    if ($rootful -eq "1" -And $userNetworking -eq "1") {
-        $flags="--rootful --user-mode-networking"
+    if ($userNetworking -eq "1") {
+        $flags += "--user-mode-networking "
     }
+    $flags = $flags.Trim()
+    $flagsArray = $flags -split ' '
     write-host "Initializing podman machine, command: podman machine init $flags"
     $logFile = "$workingDir\$resultsFolder\podman-machine-init.log"
     "podman machine init $flags" > $logFile
     if($flags) {
         # If more flag will be necessary, we have to consider composing the command other way
         # ie. https://stackoverflow.com/questions/6604089/dynamically-generate-command-line-command-then-invoke-using-powershell
-        podman machine init $flags >> $logFile
+        podman machine init $flagsArray >> $logFile
     } else {
         podman machine init >> $logFile
     }
