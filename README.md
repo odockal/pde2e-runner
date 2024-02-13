@@ -1,9 +1,19 @@
 # pde2e-runner
 Podman Desktop E2E playwright test execution image
 
-## Usage examples of pde2e-runner image
+## Usage, building and pushing the image
+The repository structure:
+* `lib` folder contains platform specific (`windows/runner.ps1`, `darwin/runner.sh`) execution scripts that are shipped using `deliverest` image into a target host machine
+* `Containerfile` is a build image configuration file that accepts `--build-args`: `OS` to determine the platform for which the particulat image is being built
+* `Makefile` build instructions for building the image using `Containerfile` and pushing it into image registry
+* `builder.sh` script that executes makefile for Windows and Mac OS platforms
+
+In order to push an image, user needs to be logged in before executing building scipts.
+
+## Running the image
 
 ```sh
+# Running the image on windows
 podman run --rm -d --name pde2e-runner-run \
           -e TARGET_HOST=$(cat host) \
           -e TARGET_HOST_USERNAME=$(cat username) \
@@ -13,13 +23,40 @@ podman run --rm -d --name pde2e-runner-run \
           -e OUTPUT_FOLDER=/data \
           -e DEBUG=true \
           -v $PWD:/data:z \
-          quay.io/odockal/pde2e-runner:v0.0.1-snapshot  \
-            pd-e2e-runner/run.ps1 \
+          quay.io/odockal/pde2e-runner:v0.0.1-windows  \
+            pd-e2e-runner/runner.ps1 \
             -targetFolder pd-e2e-runner \
             -resultsFolder results \
             -fork containers \
             -branch main
-            -npmTarget "test:e2e:smoke"
+            -npmTarget "test:e2e:smoke" \ 
+            -podmanPath "C:\tools\podman\podman-4.9.0\bin" \
+            -initialize 0 \
+            -rootful 1 \
+            -start 1 \
+            -installWSL 0
+
+# Running the image on Mac OS
+podman run --rm -d --name pde2e-runner-run \
+          -e TARGET_HOST=$(cat host) \
+          -e TARGET_HOST_USERNAME=$(cat username) \
+          -e TARGET_HOST_KEY_PATH=/data/id_rsa \
+          -e TARGET_FOLDER=pd-e2e \
+          -e TARGET_RESULTS=results \
+          -e OUTPUT_FOLDER=/data \
+          -e DEBUG=true \
+          -v $PWD:/data:z \
+          quay.io/odockal/pde2e-runner:v0.0.1-darwin  \
+            pd-e2e/runner.sh \
+            --targetFolder pd-e2e-runner \
+            --resultsFolder results \
+            --fork containers \
+            --branch main \
+            --npmTarget "test:e2e" \
+            --podmanPath "$(cat results/podman-location.log)" \
+            --initialize 1 \
+            --rootful 1 \
+            --start 1
 ```
 
 ## Get the image logs
