@@ -12,10 +12,9 @@ fork="containers"
 branch="main"
 npmTarget="test:e2e:smoke"
 podmanPath=""
-initialize=1
-start=1
+initialize=0
+start=0
 rootful=0
-userNetworking=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -30,7 +29,6 @@ while [[ $# -gt 0 ]]; do
         --initialize) initialize="$2"; shift ;;
         --start) start="$2"; shift ;;
         --rootful) rootful="$2"; shift ;;
-        --userNetworking) userNetworking="$2"; shift ;;
         *) ;;
     esac
     shift
@@ -156,25 +154,22 @@ if (( initialize == 1 )); then
     if (( rootful == 1 )); then
         flags+="--rootful "
     fi
-    if (( userNetworking == 1 )); then
-        flags+="--user-mode-networking "
-    fi
     flags=$(echo "$flags" | awk '{$1=$1};1')
     flagsArray=($flags)
     echo "Initializing podman machine, command: podman machine init $flags"
     logFile="$workingDir/$resultsFolder/podman-machine-init.log"
     echo "podman machine init $flags" > "$logFile"
     if (( ${#flagsArray[@]} > 0 )); then
-        podman machine init "${flagsArray[@]}" >> "$logFile"
+        podman machine init "${flagsArray[@]}" 2>&1 | tee -a "$logFile"
     else
-        podman machine init >> "$logFile"
+        podman machine init 2>&1 | tee -a "$logFile"
     fi
     if (( start == 1 )); then
         echo "Starting podman machine..."
-        echo "podman machine start" >> "$logfile"
-        podman machine start >> "$logFile"
+        echo "podman machine start" >> "$logFile"
+        podman machine start 2>&1 | tee -a "$logFile"
     fi
-    podman machine ls >> "$logFile"
+    podman machine ls 2>&1 | tee -a "$logFile"
 fi
 
 # Checkout Podman Desktop if it does not exist

@@ -16,9 +16,9 @@ param(
     [Parameter(HelpMessage = 'Podman Installation path - bin directory')]
     [string]$podmanPath = "",
     [Parameter(HelpMessage = 'Initialize podman machine, default is 0/false')]
-    $initialize='1',
+    $initialize='0',
     [Parameter(HelpMessage = 'Start Podman machine, default is 0/false')]
-    $start='1',
+    $start='0',
     [Parameter(HelpMessage = 'Podman machine rootful flag, default 0/false')]
     $rootful='0',
     [Parameter(HelpMessage = 'Podman machine user-mode-networking flag, default 0/false')]
