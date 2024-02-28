@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Versions variables
-nodeVersion="v18.19.0"
+nodeVersion="v20.11.1"
 gitVersion="2.42.0"
 
 pdUrl=""
