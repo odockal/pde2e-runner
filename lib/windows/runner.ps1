@@ -22,12 +22,18 @@ param(
     [Parameter(HelpMessage = 'Podman machine rootful flag, default 0/false')]
     $rootful='0',
     [Parameter(HelpMessage = 'Podman machine user-mode-networking flag, default 0/false')]
-    $userNetworking='0'
+    $userNetworking='0',
+    [Parameter(HelpMessage = 'Environmental variables to be passed from the CI into a script, tests parameterization')]
+    $envVars='',
+    [Parameter(HelpMessage = 'Path to a secret file')]
+    [string]$secretFile=''
 )
 
 # Program Versions
 $nodejsLatestVersion = "v20.11.1"
 $gitVersion = '2.42.0.2'
+
+$global:scriptEnvVars = @()
 
 function Download-PD {
     Write-Host "Downloading Podman Desktop from $pdUrl"
@@ -40,6 +46,64 @@ function Command-Exists($command) {
     return $?
 }
 
+# Loading variables as env. var from the CI into image
+function Load-Variables() {
+    Write-Host "Loading Variables passed into image"
+    Write-Host "Input String: '$envVars'"
+    # Check if the input string is not null or empty
+    if (-not [string]::IsNullOrWhiteSpace($envVars)) {
+        # Split the input using comma separator
+        $variables = $envVars -split ','
+
+        foreach ($variable in $variables) {
+            # Split each variable definition
+            $parts = $variable -split '=', 2
+            Write-Host "Processing $variable"
+
+            # Check if the variable assignment is in VAR=Value format
+            if ($parts.Count -eq 2) {
+                $name = $parts[0].Trim()
+                $value = $parts[1].Trim('"')
+
+                # Set and test the environment variable
+                Set-Item -Path "env:$name" -Value $value
+                $global:scriptEnvVars += $name
+            } else {
+                Write-Host "Invalid variable assignment: $variable"
+            }
+        }
+    } else {
+        Write-Host "Input string is empty."
+    }
+}
+
+# Loading a secrets into env. vars from the file
+function Load-Secrets() {
+    $secretFilePath="$resourcesPath/$secretFile"
+    Write-Host "Loading Secrets from file: $secretFilePath"
+    if (Test-Path $secretFilePath) {
+        $properties = Get-Content $secretFilePath | ForEach-Object {
+            # Ignore comments and empty lines
+            if (-not $_.StartsWith("#") -and -not [string]::IsNullOrWhiteSpace($_)) {
+                # Split each line into key-value pairs
+                $key, $value = $_ -split '=', 2
+
+                # Trim leading and trailing whitespaces
+                $key = $key.Trim()
+                $value = $value.Trim()
+
+                # Set the environment variable
+                Set-Item -Path "env:$key" -Value $value
+                $global:scriptEnvVars += $key
+            }
+        }
+        Write-Host "Secrets loaded from '$secretFilePath' and set as environment variables."
+    } else {
+        Write-Host "File '$secretFilePath' not found."
+    }
+}
+
+# Execution beginning
 Write-Host "Podman desktop E2E runner script is being run..."
 
 write-host "Switching to a target folder: " $targetFolder
@@ -49,11 +113,20 @@ mkdir -p $resultsFolder
 $workingDir=Get-Location
 write-host "Working location: " $workingDir
 
+# Capture resources path location
+$resourcesPath=$workingDir
+
 # Specify the user profile directory
 $userProfile = $env:USERPROFILE
 
 # Specify the shared tools directory
 $toolsInstallDir = Join-Path $userProfile 'tools'
+
+# load variables
+Load-Variables
+
+# load secrets
+Load-Secrets
 
 $podmanDesktopBinary=""
 
@@ -83,6 +156,10 @@ if (-not (Command-Exists "node -v")) {
 # verify node, npm, yarn installation
 node -v
 npm -v
+
+# Install Yarn
+write-host "Installing yarn"
+npm install -g yarn
 yarn --version
 
 # GIT clone and checkout part
@@ -169,5 +246,13 @@ yarn $npmTarget
 write-host "Collecting the results into: " "$workingDir\$resultsFolder\"
 
 cp -r $workingDir\podman-desktop\tests\output\* $workingDir\$resultsFolder\
+
+# Cleaning up (secrets, env. vars.)
+write-host "Purge env vars: $scriptEnvVars"
+foreach ($var in $scriptEnvVars) {
+    Remove-Item -Path "env:\$var"
+}
+Write-Host "Remove secrets file $resourcesPath/$secretFile from the target"
+Remove-Item -Path "$resourcesPath/$secretFile"
 
 write-host "Script finished..."

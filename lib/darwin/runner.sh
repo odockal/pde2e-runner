@@ -4,6 +4,8 @@
 nodeVersion="v20.11.1"
 gitVersion="2.42.0"
 
+declare -a script_env_vars
+
 pdUrl=""
 pdPath=""
 targetFolder=""
@@ -15,6 +17,7 @@ podmanPath=""
 initialize=0
 start=0
 rootful=0
+envVars=''
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -29,14 +32,68 @@ while [[ $# -gt 0 ]]; do
         --initialize) initialize="$2"; shift ;;
         --start) start="$2"; shift ;;
         --rootful) rootful="$2"; shift ;;
+        --envVars) envVars="$2"; shift ;;
+        --secretFile) secretFile="$2"; shift ;;
         *) ;;
     esac
     shift
 done
 
-Download_PD() {
+# Functions
+download_pd() {
     echo "Downloading Podman Desktop from $pdUrl"
     curl -L "$pdUrl" -o pd.exe
+}
+
+# Create a env. vars from a string: VAR=VAL,VAR2=VAL
+function load_variables() {
+    echo "Loading Variables passed into image"
+    echo "Env. Vars String: '$envVars'"
+    # Check if the input string is not null or empty
+    if [ -n "$envVars" ]; then
+        # use input field separator
+        IFS=',' read -ra VARIABLES <<< "$envVars"
+
+        for var in "${VARIABLES[@]}"; do
+            echo "Processing $var"
+            # Split each variable definition
+            IFS='=' read -r name value <<< "$var"
+
+            # Check if the variable assignment is in VAR=Value format
+            if [ -n "$value" ]; then
+                # Set the environment variable
+                export "$name"="$value"
+                newValue="${!name}"
+                script_env_vars+=("$name")
+            else
+                echo "Invalid variable assignment: $variable"
+            fi
+        done
+    else
+        echo "Input string is empty."
+    fi
+}
+
+# Loading a secrets into env. vars from the file
+function load_secrets() {
+    secretFilePath="$resourcesPath/$secretFile"
+    echo "Loading Secrets from file: $secretFilePath"
+    if [ -f "$secretFilePath" ]; then
+        while IFS='=' read -r key value || [ -n "$key" ]; do
+            # Ignore comments and empty lines
+            if [[ ! $key =~ ^\s*# && -n $key ]]; then
+                # Trim leading and trailing whitespaces
+                key=$(echo "$key" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                value=$(echo "$value" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                # Set the environment variable
+                export "$key"="$value"
+                script_env_vars+=("$key")
+            fi
+        done < "$secretFilePath"
+        echo "Secrets loaded from '$secretFilePath' and set as environment variables."
+    else
+        echo "File '$secretFilePath' not found."
+    fi
 }
 
 
@@ -65,6 +122,14 @@ outputFile="pde2e-binary-path.log"
 
 # Determine the system's arch
 architecture=$(uname -m)
+
+resourcesPath=$workingDir
+
+# Loading env. vars
+load_variables
+
+# load secrets
+load_secrets
 
 # Create the tools directory if it doesn't exist
 if [ ! -d "$toolsInstallDir" ]; then
@@ -201,5 +266,13 @@ yarn "$npmTarget" 2>&1 | tee -a $testsOutputLog
 
 echo "Collecting the results into: $workingDir/$resultsFolder/"
 cp -r "$workingDir/podman-desktop/tests/output/"* "$workingDir/$resultsFolder/"
+
+
+# Cleaning up, env vars - secrets
+echo "Cleaning the host"
+unset "${script_env_vars[@]}"
+
+# Remove secrets file
+rm "$resourcesPath/$secretFile"
 
 echo "Script finished..."
