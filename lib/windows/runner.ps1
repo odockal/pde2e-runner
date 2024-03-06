@@ -177,10 +177,18 @@ if (-not (Command-Exists "podman")) {
     # Download and install the nightly podman for windows
     Write-host "Podman is not installed..."
     if ($podmanPath) {
+        write-host "Content of the $podmanPath:"
+        $items = Get-ChildItem -Path $myPath
+        foreach ($item in $items) {
+            Write-Host $item.FullName
+        }
         write-host "Settings podman binary location to PATH"
         $env:Path += ";$podmanPath"
     }
 }
+
+# Test podman version installed
+podman -v
 
 # Setup podman machine in the host system
 if ($initialize -eq "1") {
@@ -238,13 +246,13 @@ $env:CI = $true
 
 ## YARN INSTALL AND TEST PART
 write-host "Installing dependencies"
-yarn install
+yarn install 2>&1 | Tee-Object -FilePath 'output.log' -Append
 write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-yarn $npmTarget
+yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
 
 ## Collect results
 write-host "Collecting the results into: " "$workingDir\$resultsFolder\"
-
+cp output.log $workingDir\$resultsFolder\
 cp -r $workingDir\podman-desktop\tests\output\* $workingDir\$resultsFolder\
 
 # Cleaning up (secrets, env. vars.)
