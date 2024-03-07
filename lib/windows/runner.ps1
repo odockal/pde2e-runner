@@ -177,7 +177,7 @@ if (-not (Command-Exists "podman")) {
     # Download and install the nightly podman for windows
     Write-host "Podman is not installed..."
     if ($podmanPath) {
-        write-host "Content of the $podmanPath:"
+        write-host "Content of the $podmanPath"
         $items = Get-ChildItem -Path $myPath
         foreach ($item in $items) {
             Write-Host $item.FullName
