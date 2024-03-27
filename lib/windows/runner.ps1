@@ -254,6 +254,9 @@ yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
 write-host "Collecting the results into: " "$workingDir\$resultsFolder\"
 cp output.log $workingDir\$resultsFolder\
 cp -r $workingDir\podman-desktop\tests\output\* $workingDir\$resultsFolder\
+if (Test-Path "$workingDir\podman-desktop\tests\playwright\output") {
+    cp -r $workingDir\podman-desktop\tests\playwright\output\* $workingDir\$resultsFolder\
+}
 
 # Cleaning up (secrets, env. vars.)
 write-host "Purge env vars: $scriptEnvVars"
