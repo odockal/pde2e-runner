@@ -66,27 +66,29 @@ spec:
   - name: podman-start
     description: Podman machine start param
     default: '1'
-  - name: podman-rootfull
+  - name: podman-rootful
     description: Initialize rootful podman machine
     default: '0'
   - name: podman-user-networking
     description: Set userModeNetworking flag
     default: '0'
   # Results parameters
-  - name: worspace-qe-subpath
+  - name: workspace-qe-subpath
     description: subpath relative to workspace path where results are stored
     default: qe-results
   - name: results-folder
-    description: filename for the junit file holding the e2e results
+    description: directory for the junit file(s) holding the e2e results and other test artifacts
     default: results
   # Control params
   - name: target-cleanup
     description: 'this param controls if folder on target host will be removed. Defaults true'
-    deafult: 'true'
+    default: 'false'
 
   results:
   - name: duration
     description: total amount of time in seconds for the qe execution
+  - name: results-folder-path
+    description: gettting path to the results folder into results
 
   steps:
   - name: e2e
@@ -107,7 +109,7 @@ spec:
       TARGET_FOLDER=pd-e2e
       TARGET_RESULTS=$(params.results-folder)
       TARGET_CLEANUP=$(params.target-cleanup)
-      OUTPUT_FOLDER=$(workspaces.pipelines-data.path)/$(params.workspace-resources-path)/$(params.worspace-qe-subpath)
+      OUTPUT_FOLDER=$(workspaces.pipelines-data.path)/$(params.workspace-resources-path)/$(params.workspace-qe-subpath)
       mkdir -p "${OUTPUT_FOLDER}"
       
       # Create command - command to sbustitue from GHA workflow using images
@@ -143,6 +145,9 @@ spec:
 
       # Results
       echo -n "${SECONDS}" | tee $(results.duration.path)
+      # use this example to fill the value of the pd-path into results
+      ls -R ${OUTPUT_FOLDER}
+      echo -n "$(cat ${OUTPUT_FOLDER}/${TARGET_RESULTS}/pde2e-binary-path.log)" | tee $(results.results-folder-path.path)
       
     resources:      
       requests:
