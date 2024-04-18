@@ -76,7 +76,7 @@ function Clone-Checkout($repo, $fork, $branch) {
         write-host "Checking out" $repositoryURL
         git clone $repositoryURL
     }
-    # Checkout correct branch  
+    # Checkout correct branch
     cd $repo
     write-host "Fetch all refs"
     git fetch --all
@@ -298,6 +298,7 @@ Copy-Exists $workingDir\podman-desktop\tests\output\* $target
 Copy-Exists $workingDir\podman-desktop\tests\playwright\output\* $target
 # reduce the size of the artifacts
 if (Test-Path "$target\traces\raw") {
+    write-host "Removing raw playwright trace files"
     rm -f "$target\traces\raw"
 }
 
@@ -312,11 +313,12 @@ if ($extTests -eq "1") {
     mkdir -p "$workingDir\$resultsFolder\$extRepo"
     $target="$workingDir\$resultsFolder\$extRepo"
     write-host "Collecting the results into: " $target
-    Copy-Exists $workingDir\podman-desktop\output.log $target
-    Copy-Exists $workingDir\podman-desktop\tests\output\* $target
-    Copy-Exists $workingDir\podman-desktop\tests\playwright\output\* $target
+    Copy-Exists $workingDir\$extRepo\output.log $target
+    Copy-Exists $workingDir\$extRepo\tests\output\* $target
+    Copy-Exists $workingDir\$extRepo\tests\playwright\output\* $target
     # reduce the size of the artifacts
     if (Test-Path "$target\traces\raw") {
+        write-host "Removing raw playwright trace files"
         rm -f "$target\traces\raw"
     }
 }
