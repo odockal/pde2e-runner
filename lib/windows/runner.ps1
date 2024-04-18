@@ -159,6 +159,10 @@ $userProfile = $env:USERPROFILE
 
 # Specify the shared tools directory
 $toolsInstallDir = Join-Path $userProfile 'tools'
+if (-not(Test-Path -Path $toolsInstallDir)) {
+    write-host "Tools directory does not exists, creating..."
+    mkdir -p $toolsInstallDir
+}
 
 # load variables
 Load-Variables
@@ -299,7 +303,7 @@ Copy-Exists $workingDir\podman-desktop\tests\playwright\output\* $target
 # reduce the size of the artifacts
 if (Test-Path "$target\traces\raw") {
     write-host "Removing raw playwright trace files"
-    rm -f "$target\traces\raw"
+    rm -r "$target\traces\raw"
 }
 
 ## run extension e2e tests
@@ -319,7 +323,7 @@ if ($extTests -eq "1") {
     # reduce the size of the artifacts
     if (Test-Path "$target\traces\raw") {
         write-host "Removing raw playwright trace files"
-        rm -f "$target\traces\raw"
+        rm -r "$target\traces\raw"
     }
 }
 
