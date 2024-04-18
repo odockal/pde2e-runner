@@ -7,12 +7,20 @@ param(
     $targetFolder,
     [Parameter(Mandatory,HelpMessage='Results folder')]
     $resultsFolder="results",
-    [Parameter(HelpMessage = 'Fork')]
+    [Parameter(HelpMessage = 'Podman Desktop Fork')]
     [string]$fork = "containers",
-    [Parameter(HelpMessage = 'Branch')]
+    [Parameter(HelpMessage = 'Podman Desktop Branch')]
     [string]$branch = "main",
+    [Parameter(HelpMessage = 'Extension repo')]
+    [string]$extRepo = "podman-desktop-redhat-account-ext",
+    [Parameter(HelpMessage = 'Extension Fork')]
+    [string]$extFork = "redhat-developer",
+    [Parameter(HelpMessage = 'Extension Branch')]
+    [string]$extBranch = "main",
     [Parameter(HelpMessage = 'Npm Target to run')]
-    [string]$npmTarget = "test:e2e:smoke",
+    [string]$npmTarget = "test:e2e",
+    [Parameter(HelpMessage = 'Run Extension Tests - 0/false')]
+    $extTests='0',
     [Parameter(HelpMessage = 'Podman Installation path - bin directory')]
     [string]$podmanPath = "",
     [Parameter(HelpMessage = 'Initialize podman machine, default is 0/false')]
@@ -44,6 +52,35 @@ function Download-PD {
 function Command-Exists($command) {
     $null = Get-Command -Name $command -ErrorAction SilentlyContinue
     return $?
+}
+
+function Copy-Exists($source, $target) {
+    if (Test-Path -Path $source) {
+        write-host "Copying all from $source"
+        cp -r $source $target
+    } else {
+        write-host "$source does not exist"
+    }
+}
+
+function Clone-Checkout($repo, $fork, $branch) {
+    # clean up previous folder
+    cd $workingDir
+    write-host "Working Dir: " $workingDir
+    write-host "Cloning " $repo
+    if (Test-Path -Path $repo) {
+        write-host "repository already exists"
+    } else {
+        # Clone the GitHub repository and switch to the specified branch
+        $repositoryURL ="https://github.com/$fork/$repo.git"
+        write-host "Checking out" $repositoryURL
+        git clone $repositoryURL
+        write-host "checking out into $repo"
+    }
+    # Checkout correct branch  
+    cd $repo
+    write-host "checking out branch: $branch"
+    git checkout $branch
 }
 
 # Loading variables as env. var from the CI into image
@@ -219,22 +256,13 @@ if ($initialize -eq "1") {
     podman machine ls >> $logFile
 }
 
-# clean up previous folder
-cd $workingDir
-write-host "Working Dir: " $workingDir
-if (Test-Path -Path "podman-desktop") {
-    write-host "podman-desktop github repo exists"
-} else {
-    # Clone the GitHub repository and switch to the specified branch
-    $repositoryURL ="https://github.com/$fork/podman-desktop.git"
-    write-host "Checking out" $repositoryURL
-    git clone $repositoryURL
-    write-host "checking out into podman-desktop"
-}
 
-cd podman-desktop
-write-host "checking out branch: $branch"
-git checkout $branch
+# checkout podman-desktop
+Clone-Checkout 'podman-desktop' $fork $branch
+
+if ($extTests -eq "1") {
+    Clone-Checkout $extRepo $extFork $extBranch
+}
 
 # Set PDOMAN_DESKTOP_BINARY if exists
 if($podmanDesktopBinary) {
@@ -244,18 +272,52 @@ if($podmanDesktopBinary) {
 # Setup CI env. var.
 $env:CI = $true
 
-## YARN INSTALL AND TEST PART
-write-host "Installing dependencies"
+if ($extTests -eq "1") {
+    $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
+}
+
+## YARN INSTALL AND TEST PART PODMAN-DESKTOP
+cd "$workingDir\podman-desktop"
+write-host "Installing dependencies of podman-desktop"
 yarn install 2>&1 | Tee-Object -FilePath 'output.log' -Append
-write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+if ($extTests -ne "1") {
+    write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
+    yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+} else {
+    write-host "Building podman-desktop to run e2e from extension repo"
+    yarn test:e2e:build 2>&1 | Tee-Object -FilePath 'output.log' -Append
+}
 
 ## Collect results
-write-host "Collecting the results into: " "$workingDir\$resultsFolder\"
-cp output.log $workingDir\$resultsFolder\
-cp -r $workingDir\podman-desktop\tests\output\* $workingDir\$resultsFolder\
-if (Test-Path "$workingDir\podman-desktop\tests\playwright\output") {
-    cp -r $workingDir\podman-desktop\tests\playwright\output\* $workingDir\$resultsFolder\
+mkdir -p "$workingDir\$resultsFolder\podman-desktop"
+$target="$workingDir\$resultsFolder\podman-desktop"
+write-host "Collecting the results into: " $target
+Copy-Exists $workingDir\podman-desktop\output.log $target
+Copy-Exists $workingDir\podman-desktop\tests\output\* $target
+Copy-Exists $workingDir\podman-desktop\tests\playwright\output\* $target
+# reduce the size of the artifacts
+if (Test-Path "$target\traces\raw") {
+    rm -f "$target\traces\raw"
+}
+
+## run extension e2e tests
+if ($extTests -eq "1") {
+    cd "$workingDir\$extRepo"
+    write-host "Installing dependencies of $repo"
+    yarn install 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    write-host "Running the e2e playwright tests using target: $npmTarget"
+    yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    ## Collect results
+    mkdir -p "$workingDir\$resultsFolder\$extRepo"
+    $target="$workingDir\$resultsFolder\$extRepo"
+    write-host "Collecting the results into: " $target
+    Copy-Exists $workingDir\podman-desktop\output.log $target
+    Copy-Exists $workingDir\podman-desktop\tests\output\* $target
+    Copy-Exists $workingDir\podman-desktop\tests\playwright\output\* $target
+    # reduce the size of the artifacts
+    if (Test-Path "$target\traces\raw") {
+        rm -f "$target\traces\raw"
+    }
 }
 
 # Cleaning up (secrets, env. vars.)
