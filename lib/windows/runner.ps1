@@ -75,10 +75,11 @@ function Clone-Checkout($repo, $fork, $branch) {
         $repositoryURL ="https://github.com/$fork/$repo.git"
         write-host "Checking out" $repositoryURL
         git clone $repositoryURL
-        write-host "checking out into $repo"
     }
     # Checkout correct branch  
     cd $repo
+    write-host "Fetch all refs"
+    git fetch --all
     write-host "checking out branch: $branch"
     git checkout $branch
 }
