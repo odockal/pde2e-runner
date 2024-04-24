@@ -284,7 +284,7 @@ if ($extTests -eq "1") {
 ## YARN INSTALL AND TEST PART PODMAN-DESKTOP
 cd "$workingDir\podman-desktop"
 write-host "Installing dependencies of podman-desktop"
-yarn install 2>&1 | Tee-Object -FilePath 'output.log' -Append
+yarn install --frozen-lockfile --network-timeout 180000 2>&1 | Tee-Object -FilePath 'output.log' -Append
 if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
     yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
@@ -310,7 +310,7 @@ if (Test-Path "$target\traces\raw") {
 if ($extTests -eq "1") {
     cd "$workingDir\$extRepo"
     write-host "Installing dependencies of $repo"
-    yarn install 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    yarn install --frozen-lockfile --network-timeout 180000 2>&1 | Tee-Object -FilePath 'output.log' -Append
     write-host "Running the e2e playwright tests using target: $npmTarget"
     yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     ## Collect results
