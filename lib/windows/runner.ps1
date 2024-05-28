@@ -309,6 +309,12 @@ if (Test-Path "$target\traces\raw") {
 ## run extension e2e tests
 if ($extTests -eq "1") {
     cd "$workingDir\$extRepo"
+    write-host "Add latest version of the @podman-desktop/tests-playwright into right package.json"
+    if (Test-Path "$workingDir\$extRepo\tests\playwright") {
+        cd tests/playwright
+    }
+    yarn add -D @podman-desktop/tests-playwright@next
+    cd "$workingDir\$extRepo"
     write-host "Installing dependencies of $repo"
     yarn install 2>&1 | Tee-Object -FilePath 'output.log' -Append
     write-host "Running the e2e playwright tests using target: $npmTarget"
