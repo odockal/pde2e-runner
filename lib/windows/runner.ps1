@@ -117,27 +117,31 @@ function Load-Variables() {
 
 # Loading a secrets into env. vars from the file
 function Load-Secrets() {
-    $secretFilePath="$resourcesPath/$secretFile"
-    Write-Host "Loading Secrets from file: $secretFilePath"
-    if (Test-Path $secretFilePath) {
-        $properties = Get-Content $secretFilePath | ForEach-Object {
-            # Ignore comments and empty lines
-            if (-not $_.StartsWith("#") -and -not [string]::IsNullOrWhiteSpace($_)) {
-                # Split each line into key-value pairs
-                $key, $value = $_ -split '=', 2
+    if ($secretFile) {
+        $secretFilePath="$resourcesPath/$secretFile"
+        Write-Host "Loading Secrets from file: $secretFilePath"
+        if (Test-Path $secretFilePath) {
+            $properties = Get-Content $secretFilePath | ForEach-Object {
+                # Ignore comments and empty lines
+                if (-not $_.StartsWith("#") -and -not [string]::IsNullOrWhiteSpace($_)) {
+                    # Split each line into key-value pairs
+                    $key, $value = $_ -split '=', 2
 
-                # Trim leading and trailing whitespaces
-                $key = $key.Trim()
-                $value = $value.Trim()
+                    # Trim leading and trailing whitespaces
+                    $key = $key.Trim()
+                    $value = $value.Trim()
 
-                # Set the environment variable
-                Set-Item -Path "env:$key" -Value $value
-                $global:scriptEnvVars += $key
+                    # Set the environment variable
+                    Set-Item -Path "env:$key" -Value $value
+                    $global:scriptEnvVars += $key
+                }
             }
+            Write-Host "Secrets loaded from '$secretFilePath' and set as environment variables."
+        } else {
+            Write-Host "File '$secretFilePath' not found."
         }
-        Write-Host "Secrets loaded from '$secretFilePath' and set as environment variables."
     } else {
-        Write-Host "File '$secretFilePath' not found."
+        write-host "There is no file with secrets, skipping..."
     }
 }
 
@@ -338,7 +342,9 @@ write-host "Purge env vars: $scriptEnvVars"
 foreach ($var in $scriptEnvVars) {
     Remove-Item -Path "env:\$var"
 }
-Write-Host "Remove secrets file $resourcesPath/$secretFile from the target"
-Remove-Item -Path "$resourcesPath/$secretFile"
+if ($secretFile) {
+    Write-Host "Remove secrets file $resourcesPath/$secretFile from the target"
+    Remove-Item -Path "$resourcesPath/$secretFile"
+}
 
 write-host "Script finished..."
