@@ -329,7 +329,7 @@ if ($extTests -eq "1") {
     write-host "Collecting the results into: " $target
     Copy-Exists $workingDir\$extRepo\output.log $target
     Copy-Exists $workingDir\$extRepo\tests\output\* $target
-    Copy-Exists $workingDir\$extRepo\tests\playwright\output\* $target
+    Copy-Exists $workingDir\$extRepo\tests\playwright\tests\output\* $target
     # reduce the size of the artifacts
     if (Test-Path "$target\traces\raw") {
         write-host "Removing raw playwright trace files"
