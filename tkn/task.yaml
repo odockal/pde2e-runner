@@ -54,6 +54,18 @@ spec:
   - name: branch
     description: Podman Desktop repository branch or tag to checkout
     default: 'main'
+  - name: ext-repo
+    description: Podman Desktop Extension repo name
+    default: 'podman-desktop-extension-bootc'
+  - name: ext-fork
+    description: Podman Desktop extension repo fork
+    default: 'containers'
+  - name: ext-branch
+    description: Podman Desktop repository branch or tag to checkout
+    default: 'main'
+  - name: ext-tests
+    description: Whether run the E2E tests from the extension
+    default: '0'
   - name: npm-target
     description: npm script task for tests execution
     default: 'test:e2e'
@@ -68,10 +80,16 @@ spec:
     default: '1'
   - name: podman-rootful
     description: Initialize rootful podman machine
-    default: '0'
+    default: '1'
   - name: podman-user-networking
     description: Set userModeNetworking flag
     default: '0'
+  - name: env-vars
+    description: Environment variables to be passed into image
+    default: 'TEST_PODMAN_MACHINE=true'
+  - name: secret-file
+    description: A path to the files with secrets
+    default: "''"
   # Results parameters
   - name: workspace-qe-subpath
     description: subpath relative to workspace path where results are stored
@@ -117,19 +135,36 @@ spec:
         cmd="${TARGET_FOLDER}/runner.ps1 "
         cmd="$cmd -targetFolder ${TARGET_FOLDER} "
         cmd="$cmd -resultsFolder ${TARGET_RESULTS} "
+        cmd="$cmd -pdPath $(params.pd-path) "
+        cmd="$cmd -pdUrl $(params.pd-url) "
         cmd="$cmd -fork $(params.fork) "
         cmd="$cmd -branch $(params.branch) "
+        cmd="$cmd -extTests $(params.ext-tests) "
+        cmd="$cmd -extRepo $(params.ext-repo) "
+        cmd="$cmd -extFork $(params.ext-fork) "
+        cmd="$cmd -extBranch $(params.ext-branch) "
+        cmd="$cmd -envVars $(params.env-vars) "
+        cmd="$cmd -secretFile $(params.secret-file) "
         cmd="$cmd -npmTarget $(params.npm-target) "
         cmd="$cmd -podmanPath $(params.podman-path) "
         cmd="$cmd -initialize $(params.podman-initialize) "
         cmd="$cmd -start $(params.podman-start) "
         cmd="$cmd -rootful $(params.podman-rootful) "
         cmd="$cmd -userNetworking $(params.podman-user-networking)"
+        cmd="$cmd -installWSL $(params.podman-rootful) "
       fi
       if [[ $(params.os) == "darwin" ]]; then
         cmd="${TARGET_FOLDER}/runner.sh "
         cmd="$cmd --targetFolder ${TARGET_FOLDER} "
         cmd="$cmd --resultsFolder ${TARGET_RESULTS} "
+        cmd="$cmd --pdPath $(params.pd-path) "
+        cmd="$cmd --pdUrl $(params.pd-url) "
+        cmd="$cmd --extTests $(params.ext-tests) "
+        cmd="$cmd --extRepo $(params.ext-repo) "
+        cmd="$cmd --extFork $(params.ext-fork) "
+        cmd="$cmd --extBranch $(params.ext-branch) "
+        cmd="$cmd --envVars $(params.env-vars) "
+        cmd="$cmd --secretFile $(params.secret-file) "
         cmd="$cmd --fork $(params.fork) "
         cmd="$cmd --branch $(params.branch) "
         cmd="$cmd --npmTarget $(params.npm-target) "
@@ -137,7 +172,6 @@ spec:
         cmd="$cmd --initialize $(params.podman-initialize) "
         cmd="$cmd --start $(params.podman-start) "
         cmd="$cmd --rootful $(params.podman-rootful) "
-        cmd="$cmd --userNetworking $(params.podman-user-networking)" 
       fi
       
       # Exec

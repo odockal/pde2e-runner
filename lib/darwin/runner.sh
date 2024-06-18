@@ -12,7 +12,11 @@ targetFolder=""
 resultsFolder="results"
 fork="containers"
 branch="main"
-npmTarget="test:e2e:smoke"
+extTests=0
+extRepo="podman-desktop-extension-bootc"
+extFork="containers"
+extBranch="main"
+npmTarget="test:e2e"
 podmanPath=""
 initialize=0
 start=0
@@ -27,6 +31,10 @@ while [[ $# -gt 0 ]]; do
         --resultsFolder) resultsFolder="$2"; shift ;;
         --fork) fork="$2"; shift ;;
         --branch) branch="$2"; shift ;;
+        --extRepo) extRepo="$2"; shift ;;
+        --extTests) extTests="$2"; shift ;;
+        --extFork) extFork="$2"; shift ;;
+        --extBranch) extBranch="$2"; shift ;;
         --npmTarget) npmTarget="$2"; shift ;;
         --podmanPath) podmanPath="$2"; shift ;;
         --initialize) initialize="$2"; shift ;;
@@ -77,22 +85,75 @@ function load_variables() {
 # Loading a secrets into env. vars from the file
 function load_secrets() {
     secretFilePath="$resourcesPath/$secretFile"
-    echo "Loading Secrets from file: $secretFilePath"
-    if [ -f "$secretFilePath" ]; then
-        while IFS='=' read -r key value || [ -n "$key" ]; do
-            # Ignore comments and empty lines
-            if [[ ! $key =~ ^\s*# && -n $key ]]; then
-                # Trim leading and trailing whitespaces
-                key=$(echo "$key" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                value=$(echo "$value" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                # Set the environment variable
-                export "$key"="$value"
-                script_env_vars+=("$key")
-            fi
-        done < "$secretFilePath"
-        echo "Secrets loaded from '$secretFilePath' and set as environment variables."
+    if [ -f $secretFilePath ]; then
+        echo "Loading Secrets from file: $secretFilePath"
+        if [ -f "$secretFilePath" ]; then
+            while IFS='=' read -r key value || [ -n "$key" ]; do
+                # Ignore comments and empty lines
+                if [[ ! $key =~ ^\s*# && -n $key ]]; then
+                    # Trim leading and trailing whitespaces
+                    key=$(echo "$key" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                    value=$(echo "$value" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                    # Set the environment variable
+                    export "$key"="$value"
+                    script_env_vars+=("$key")
+                fi
+            done < "$secretFilePath"
+            echo "Secrets loaded from '$secretFilePath' and set as environment variables."
+        else
+            echo "File '$secretFilePath' not found."
+        fi
     else
-        echo "File '$secretFilePath' not found."
+        echo "Secret File does not exist on $secretFilePath"
+    fi
+}
+
+# Loading a secrets into env. vars from the file
+function clone_checkout() {
+    # Checkout Podman Desktop if it does not exist
+    local_repo=$1
+    local_fork=$2
+    local_branch=$3
+    echo "Working Dir: $workingDir"
+    echo "Cloning $local_repo"
+    if [ -d $local_repo ]; then
+        echo "$local_repo github repo exists"
+    else
+        repositoryURL="https://github.com/$local_fork/$local_repo.git"
+        echo "Checking out $repositoryURL"
+        git clone $repositoryURL
+    fi
+
+    cd $local_repo || exit
+    echo "Fetching all branches and tags"
+    git fetch --all
+    echo "Checking out branch: $local_branch"
+    git checkout $local_branch
+}
+
+function copy_exists() {
+    source=$1
+    target=$2
+    if [ -e $source ]; then
+        echo "Copying files from $source to $target"
+        cp -r $source $target
+    else 
+        echo "Path $source does not exist"
+    fi
+}
+
+function collect_logs() {
+    folder="$1"
+    mkdir -p "$workingDir/$resultsFolder/$folder"
+    target="$workingDir/$resultsFolder/$folder"
+    write-host "Collecting the results into: " $target
+    copy_exists "$workingDir/$folder/output.log" $target
+    copy_exists "$workingDir/$folder/tests/output/" $target
+    copy_exists "$workingDir/$folder/tests/playwright/output/" $target
+    # reduce the size of the artifacts
+    if [ -d "$target\traces\raw"]; then
+        echo "Removing raw playwright trace files"
+        rm -r "$target\traces\raw"
     fi
 }
 
@@ -237,42 +298,60 @@ if (( initialize == 1 )); then
     podman machine ls 2>&1 | tee -a "$logFile"
 fi
 
-# Checkout Podman Desktop if it does not exist
-echo "Working Dir: $workingDir"
-if [ -d "podman-desktop" ]; then
-    echo "podman-desktop github repo exists"
-else
-    repositoryURL="https://github.com/$fork/podman-desktop.git"
-    echo "Checking out $repositoryURL"
-    git clone "$repositoryURL"
-fi
+# Checkout Podman Desktop
+clone-checkout "podman-desktop" $fork $branch
 
-cd "podman-desktop" || exit
-echo "Fetching all branches and tags"
-git fetch --all
-echo "Checking out branch: $branch"
-git checkout "$branch"
+if (( extTests == 1 )); then
+    # Checkout Podman Desktop if it does not exist
+    clone-checkout $extTests $extFork $extBranch
+fi
 
 if [ -n "$podmanDesktopBinary" ]; then
     export PODMAN_DESKTOP_BINARY="$podmanDesktopBinary"
 fi
 
+if (( extTests == 1 )); then
+    export PODMAN_DESKTOP_ARGS="$workingDir/podman-desktop"
+fi
+
 export CI=true
 testsOutputLog="$workingDir/$resultsFolder/tests.log"
 echo "Installing dependencies storing yarn run output in: $testsOutputLog"
-yarn install 2>&1 | tee -a $testsOutputLog
-echo "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-yarn "$npmTarget" 2>&1 | tee -a $testsOutputLog
+yarn install --frozen-lockfile --network-timeout 180000 2>&1 | tee -a $testsOutputLog
+if (( extTests == 0 )); then
+    echo "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
+    yarn "$npmTarget" 2>&1 | tee -a $testsOutputLog
+    collect_logs "podman-desktop"
+else
+    echo "Building podman-desktop for extension e2e tests"
+    yarn test:e2e:build 2>&1 | tee -a $testsOutputLog
+fi
 
-echo "Collecting the results into: $workingDir/$resultsFolder/"
-cp -r "$workingDir/podman-desktop/tests/output/"* "$workingDir/$resultsFolder/"
-
+## run extension e2e tests
+if (( extTests == 1 )); then
+    cd "$workingDir/$extRepo"
+    echo "Add latest version of the @podman-desktop/tests-playwright into right package.json"
+    if [ -d "$workingDir/$extRepo/tests/playwright" ] {
+        cd tests/playwright
+    }
+    yarn add -D @podman-desktop/tests-playwright@next
+    cd "$workingDir/$extRepo"
+    echo "Installing dependencies of $extRrepo"
+    yarn install --frozen-lockfile --network-timeout 180000 2>&1 | tee -a $testsOutputLog
+    echo "Running the e2e playwright tests using target: $npmTarget"
+    yarn $npmTarget 2>&1 | tee -a $testsOutputLog
+    ## Collect results
+    collect_logs $extRepo
+fi
 
 # Cleaning up, env vars - secrets
 echo "Cleaning the host"
 unset "${script_env_vars[@]}"
 
 # Remove secrets file
-rm "$resourcesPath/$secretFile"
+if [ -f "$resourcesPath/$secretFile" ]; then
+    echo "Removing secrets file: $resourcesPath/$secretFile"
+    rm "$resourcesPath/$secretFile"
+fi
 
 echo "Script finished..."

@@ -145,6 +145,20 @@ function Load-Secrets() {
     }
 }
 
+function Collect-Logs($folder) {
+    mkdir -p "$workingDir\$resultsFolder\$folder"
+    $target="$workingDir\$resultsFolder\$folder"
+    write-host "Collecting the results into: " $target
+    Copy-Exists $workingDir\$folder\output.log $target
+    Copy-Exists $workingDir\$folder\tests\output\* $target
+    Copy-Exists $workingDir\$folder\tests\playwright\output\* $target
+    # reduce the size of the artifacts
+    if (Test-Path "$target\traces\raw") {
+        write-host "Removing raw playwright trace files"
+        rm -r "$target\traces\raw"
+    }
+}
+
 # Execution beginning
 Write-Host "Podman desktop E2E runner script is being run..."
 
@@ -292,22 +306,11 @@ yarn install --frozen-lockfile --network-timeout 180000 2>&1 | Tee-Object -FileP
 if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
     yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    ## Collect results
+    Collect-Logs "podman-desktop"
 } else {
     write-host "Building podman-desktop to run e2e from extension repo"
     yarn test:e2e:build 2>&1 | Tee-Object -FilePath 'output.log' -Append
-}
-
-## Collect results
-mkdir -p "$workingDir\$resultsFolder\podman-desktop"
-$target="$workingDir\$resultsFolder\podman-desktop"
-write-host "Collecting the results into: " $target
-Copy-Exists $workingDir\podman-desktop\output.log $target
-Copy-Exists $workingDir\podman-desktop\tests\output\* $target
-Copy-Exists $workingDir\podman-desktop\tests\playwright\output\* $target
-# reduce the size of the artifacts
-if (Test-Path "$target\traces\raw") {
-    write-host "Removing raw playwright trace files"
-    rm -r "$target\traces\raw"
 }
 
 ## run extension e2e tests
@@ -324,17 +327,7 @@ if ($extTests -eq "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget"
     yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     ## Collect results
-    mkdir -p "$workingDir\$resultsFolder\$extRepo"
-    $target="$workingDir\$resultsFolder\$extRepo"
-    write-host "Collecting the results into: " $target
-    Copy-Exists $workingDir\$extRepo\output.log $target
-    Copy-Exists $workingDir\$extRepo\tests\output\* $target
-    Copy-Exists $workingDir\$extRepo\tests\playwright\tests\output\* $target
-    # reduce the size of the artifacts
-    if (Test-Path "$target\traces\raw") {
-        write-host "Removing raw playwright trace files"
-        rm -r "$target\traces\raw"
-    }
+    Collect-Logs $extRepo
 }
 
 # Cleaning up (secrets, env. vars.)
