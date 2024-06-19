@@ -146,12 +146,12 @@ function collect_logs() {
     folder="$1"
     mkdir -p "$workingDir/$resultsFolder/$folder"
     target="$workingDir/$resultsFolder/$folder"
-    write-host "Collecting the results into: " $target
+    echo "Collecting the results into: " $target
     copy_exists "$workingDir/$folder/output.log" $target
     copy_exists "$workingDir/$folder/tests/output/" $target
     copy_exists "$workingDir/$folder/tests/playwright/output/" $target
     # reduce the size of the artifacts
-    if [ -d "$target\traces\raw"]; then
+    if [ -d "$target\traces\raw" ]; then
         echo "Removing raw playwright trace files"
         rm -r "$target\traces\raw"
     fi
@@ -299,11 +299,11 @@ if (( initialize == 1 )); then
 fi
 
 # Checkout Podman Desktop
-clone-checkout "podman-desktop" $fork $branch
+clone_checkout "podman-desktop" $fork $branch
 
 if (( extTests == 1 )); then
     # Checkout Podman Desktop if it does not exist
-    clone-checkout $extTests $extFork $extBranch
+    clone_checkout $extTests $extFork $extBranch
 fi
 
 if [ -n "$podmanDesktopBinary" ]; then
@@ -331,9 +331,9 @@ fi
 if (( extTests == 1 )); then
     cd "$workingDir/$extRepo"
     echo "Add latest version of the @podman-desktop/tests-playwright into right package.json"
-    if [ -d "$workingDir/$extRepo/tests/playwright" ] {
+    if [ -d "$workingDir/$extRepo/tests/playwright" ]; then
         cd tests/playwright
-    }
+    fi
     yarn add -D @podman-desktop/tests-playwright@next
     cd "$workingDir/$extRepo"
     echo "Installing dependencies of $extRrepo"
