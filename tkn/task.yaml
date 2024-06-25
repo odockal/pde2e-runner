@@ -90,6 +90,9 @@ spec:
   - name: secret-file
     description: A path to the files with secrets
     default: "''"
+  - name: save-traces
+    description: Whether to save playwright trace files
+    default: '0'
   # Results parameters
   - name: workspace-qe-subpath
     description: subpath relative to workspace path where results are stored
@@ -105,7 +108,7 @@ spec:
   results:
   - name: duration
     description: total amount of time in seconds for the qe execution
-  - name: results-folder-path
+  - name: junit-path
     description: gettting path to the results folder into results
 
   steps:
@@ -172,6 +175,7 @@ spec:
         cmd="$cmd --initialize $(params.podman-initialize) "
         cmd="$cmd --start $(params.podman-start) "
         cmd="$cmd --rootful $(params.podman-rootful) "
+        cmd="$cmd --saveTraces $(params.save-traces) "
       fi
       
       # Exec
@@ -181,7 +185,7 @@ spec:
       echo -n "${SECONDS}" | tee $(results.duration.path)
       # use this example to fill the value of the pd-path into results
       ls -R ${OUTPUT_FOLDER}
-      echo -n "$(cat ${OUTPUT_FOLDER}/${TARGET_RESULTS}/pde2e-binary-path.log)" | tee $(results.results-folder-path.path)
+      # echo -n "$(cat ${OUTPUT_FOLDER}/${TARGET_RESULTS}/*/junit-results.xml)" | tee $(results.junit-path.path)
       
     resources:      
       requests:

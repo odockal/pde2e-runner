@@ -22,6 +22,7 @@ initialize=0
 start=0
 rootful=0
 envVars=''
+saveTraces=0
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -42,6 +43,7 @@ while [[ $# -gt 0 ]]; do
         --rootful) rootful="$2"; shift ;;
         --envVars) envVars="$2"; shift ;;
         --secretFile) secretFile="$2"; shift ;;
+        --saveTraces) saveTraces="$2"; shift ;;
         *) ;;
     esac
     shift
@@ -151,9 +153,13 @@ function collect_logs() {
     copy_exists "$workingDir/$folder/tests/output/" $target
     copy_exists "$workingDir/$folder/tests/playwright/output/" $target
     # reduce the size of the artifacts
-    if [ -d "$target\traces\raw" ]; then
+    if [ -d "$target/traces" ]; then
         echo "Removing raw playwright trace files"
-        rm -r "$target\traces\raw"
+        rm -r "$target/traces/raw"
+        if (( saveTraces == 0)); then
+            echo "Removing all traces from test artifacts, mainly due capacity reasons"
+            rm -rf "$target/traces"
+        fi
     fi
 }
 
