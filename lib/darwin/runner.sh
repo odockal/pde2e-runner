@@ -149,6 +149,14 @@ function collect_logs() {
     mkdir -p "$workingDir/$resultsFolder/$folder"
     target="$workingDir/$resultsFolder/$folder"
     echo "Collecting the results into: " $target
+    # copy all junit xml files into target and rename them by the folder the were in
+    junits=$(find $workingDir/$folder -name "junit*.xml")
+    echo "Found Junit files: $junits"
+    for junit in $junits; do
+        target_path="$workingDir/$resultsFolder/junit-$folder.xml"
+        echo "Copying $junit and renaming to $target_path"
+        cp "$junit" $target_path
+    done
     copy_exists "$workingDir/$folder/output.log" $target
     copy_exists "$workingDir/$folder/tests/output/" $target
     copy_exists "$workingDir/$folder/tests/playwright/output/" $target

@@ -108,6 +108,8 @@ spec:
   results:
   - name: duration
     description: total amount of time in seconds for the qe execution
+  - name: junit-name
+    description: name of the junit file
   - name: junit-path
     description: gettting path to the results folder into results
 
@@ -183,9 +185,14 @@ spec:
 
       # Results
       echo -n "${SECONDS}" | tee $(results.duration.path)
-      # use this example to fill the value of the pd-path into results
+      
+      # Move all results to qe-path
+      mv ${OUTPUT_FOLDER}/${TARGET_RESULTS}/* ${OUTPUT_FOLDER}
+      rm -rf ${OUTPUT_FOLDER}/${TARGET_RESULTS}
+
       ls -R ${OUTPUT_FOLDER}
-      # echo -n "$(cat ${OUTPUT_FOLDER}/${TARGET_RESULTS}/*/junit-results.xml)" | tee $(results.junit-path.path)
+      echo -n "$(basename $(ls ${OUTPUT_FOLDER}/junit*.xml))" | tee $(results.junit-name.path)
+      echo -n "$(ls ${OUTPUT_FOLDER}/junit*.xml)" | tee $(results.junit-path.path)
       
     resources:      
       requests:
