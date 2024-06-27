@@ -93,6 +93,9 @@ spec:
   - name: save-traces
     description: Whether to save playwright trace files
     default: '0'
+  - name: clean-machine
+    description: Whether to run podman machine reset
+    default: '1'
   # Results parameters
   - name: workspace-qe-subpath
     description: subpath relative to workspace path where results are stored
@@ -178,6 +181,7 @@ spec:
         cmd="$cmd --start $(params.podman-start) "
         cmd="$cmd --rootful $(params.podman-rootful) "
         cmd="$cmd --saveTraces $(params.save-traces) "
+        cmd="$cmd --cleanMachine $(params.clean-machine) "
       fi
       
       # Exec

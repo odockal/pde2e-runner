@@ -23,6 +23,7 @@ start=0
 rootful=0
 envVars=''
 saveTraces=0
+cleanMachine=1
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
         --envVars) envVars="$2"; shift ;;
         --secretFile) secretFile="$2"; shift ;;
         --saveTraces) saveTraces="$2"; shift ;;
+        --cleanMachine) cleanMachine="$2"; shift ;;
         *) ;;
     esac
     shift
@@ -117,6 +119,7 @@ function clone_checkout() {
     local_fork=$2
     local_branch=$3
     echo "Working Dir: $workingDir"
+    cd $workingDir
     echo "Cloning $local_repo"
     if [ -d $local_repo ]; then
         echo "$local_repo github repo exists"
@@ -317,7 +320,7 @@ clone_checkout "podman-desktop" $fork $branch
 
 if (( extTests == 1 )); then
     # Checkout Podman Desktop if it does not exist
-    clone_checkout $extTests $extFork $extBranch
+    clone_checkout $extRepo $extFork $extBranch
 fi
 
 if [ -n "$podmanDesktopBinary" ]; then
@@ -330,6 +333,7 @@ fi
 
 export CI=true
 testsOutputLog="$workingDir/$resultsFolder/tests.log"
+cd "$workingDir/podman-desktop"
 echo "Installing dependencies storing yarn run output in: $testsOutputLog"
 yarn install --frozen-lockfile --network-timeout 180000 2>&1 | tee -a $testsOutputLog
 if (( extTests == 0 )); then
@@ -366,6 +370,11 @@ unset "${script_env_vars[@]}"
 if [ -f "$resourcesPath/$secretFile" ]; then
     echo "Removing secrets file: $resourcesPath/$secretFile"
     rm "$resourcesPath/$secretFile"
+fi
+
+if (( cleanMachine == 1 )); then
+    echo "Cleaning up the podman machines"
+    podman machine reset -f
 fi
 
 echo "Script finished..."
