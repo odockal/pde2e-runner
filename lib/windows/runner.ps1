@@ -152,6 +152,7 @@ function Collect-Logs($folder) {
     Copy-Exists $workingDir\$folder\output.log $target
     Copy-Exists $workingDir\$folder\tests\output\* $target
     Copy-Exists $workingDir\$folder\tests\playwright\output\* $target
+    Copy-Exists $workingDir\$folder\tests\playwright\tests\output\* $target
     # reduce the size of the artifacts
     if (Test-Path "$target\traces\raw") {
         write-host "Removing raw playwright trace files"

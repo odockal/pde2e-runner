@@ -163,6 +163,7 @@ function collect_logs() {
     copy_exists "$workingDir/$folder/output.log" $target
     copy_exists "$workingDir/$folder/tests/output/" $target
     copy_exists "$workingDir/$folder/tests/playwright/output/" $target
+    copy_exists "$workingDir/$folder/tests/playwright/tests/output/" $target
     # reduce the size of the artifacts
     if [ -d "$target/traces" ]; then
         echo "Removing raw playwright trace files"
