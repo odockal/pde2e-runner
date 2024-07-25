@@ -22,6 +22,7 @@ initialize=0
 start=0
 rootful=0
 envVars=''
+podmanProvider=''
 saveTraces=0
 cleanMachine=1
 
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
         --rootful) rootful="$2"; shift ;;
         --envVars) envVars="$2"; shift ;;
         --secretFile) secretFile="$2"; shift ;;
+        --podmanProvider) podmanProvider="$2"; shift ;;
         --saveTraces) saveTraces="$2"; shift ;;
         --cleanMachine) cleanMachine="$2"; shift ;;
         *) ;;
@@ -83,6 +85,11 @@ function load_variables() {
         done
     else
         echo "Input string is empty."
+    fi
+    # check if we have explicit podman provider env. var. added
+    if [ -n "$podmanProvider" ]; then
+        echo "Settings CONTAINERS_MACHINE_PROVIDER: $podmanProvider"
+        export CONTAINERS_MACHINE_PROVIDER=$podmanProvider
     fi
 }
 
@@ -310,10 +317,10 @@ if (( initialize == 1 )); then
     fi
     if (( start == 1 )); then
         echo "Starting podman machine..."
-        echo "podman machine start" >> "$logFile"
+        echo "podman machine start --log-level=debug" >> "$logFile"
         podman machine start 2>&1 | tee -a "$logFile"
     fi
-    podman machine ls 2>&1 | tee -a "$logFile"
+    podman machine ls --format json 2>&1 | tee -a "$logFile"
 fi
 
 # Checkout Podman Desktop

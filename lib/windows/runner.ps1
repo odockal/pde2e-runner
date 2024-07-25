@@ -33,6 +33,8 @@ param(
     $userNetworking='0',
     [Parameter(HelpMessage = 'Environmental variables to be passed from the CI into a script, tests parameterization')]
     $envVars='',
+    [Parameter(HelpMessage = 'Environmental variable to define custom podman Provider')]
+    [string]$podmanProvider='',
     [Parameter(HelpMessage = 'Path to a secret file')]
     [string]$secretFile=''
 )
@@ -112,6 +114,13 @@ function Load-Variables() {
         }
     } else {
         Write-Host "Input string is empty."
+    }
+
+    # Set custom podman provider (wsl vs. hyperv)
+    if (-not [string]::IsNullOrWhiteSpace($podmanProvider)) {
+        Write-Host "Setting CONTAINERS_MACHINE_PROVIDER: '$podmanProvider'"
+        Set-Item -Path "env:CONTAINERS_MACHINE_PROVIDER" -Value $podmanProvider
+        $global:scriptEnvVars += CONTAINERS_MACHINE_PROVIDER
     }
 }
 
@@ -277,7 +286,7 @@ if ($initialize -eq "1") {
         "podman machine start" >> $logfile
         podman machine start >> $logFile
     }
-    podman machine ls >> $logFile
+    podman machine ls --format json >> $logFile
 }
 
 
