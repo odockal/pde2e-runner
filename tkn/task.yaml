@@ -163,7 +163,7 @@ spec:
         cmd="$cmd -rootful $(params.podman-rootful) "
         cmd="$cmd -userNetworking $(params.podman-user-networking)"
         cmd="$cmd -installWSL $(params.podman-rootful) "
-        if [[ $(params.podman-provider) != "" ]]; then
+        if [[ -n "$(params.podman-provider)" ]]; then
           cmd="$cmd -podmanProvider $(params.podman-provider) "
         fi
       fi
@@ -186,7 +186,7 @@ spec:
         cmd="$cmd --initialize $(params.podman-initialize) "
         cmd="$cmd --start $(params.podman-start) "
         cmd="$cmd --rootful $(params.podman-rootful) "
-        if [[ $(params.podman-provider) != "" ]]; then
+        if [[ -n "$(params.podman-provider)" ]]; then
           cmd="$cmd --podmanProvider $(params.podman-provider) "
         fi
         cmd="$cmd --saveTraces $(params.save-traces) "

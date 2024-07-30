@@ -21,8 +21,8 @@ podmanPath=""
 initialize=0
 start=0
 rootful=0
-envVars=''
-podmanProvider=''
+envVars=""
+podmanProvider=""
 saveTraces=0
 cleanMachine=1
 
