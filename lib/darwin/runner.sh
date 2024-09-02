@@ -167,10 +167,15 @@ function collect_logs() {
         echo "Copying $junit and renaming to $target_path"
         cp "$junit" $target_path
     done
+    if (( extTests == 1 )); then
+        echo "Removing possible models from working directories"
+        rm -rf "$workingDir/$folder/**/*.gguf"
+    fi
+    
     copy_exists "$workingDir/$folder/output.log" $target
     copy_exists "$workingDir/$folder/tests/output/" $target
     copy_exists "$workingDir/$folder/tests/playwright/output/" $target
-    copy_exists "$workingDir/$folder/tests/playwright/tests/output/" $target
+         "$workingDir/$folder/tests/playwright/tests/output/" $target
     # reduce the size of the artifacts
     if [ -d "$target/traces" ]; then
         echo "Removing raw playwright trace files"
@@ -272,10 +277,10 @@ fi
 # git verification
 git --version
 
-# Install Yarn
-echo "Installing yarn"
-npm install -g yarn
-echo "Yarn Version: $(yarn --version)"
+# Install pnpm
+echo "Installing pnpm"
+sudo npm install -g pnpm
+echo "pnpm Version: $(pnpm --version)"
 
 # Podman desktop binary
 podmanDesktopBinary=""
@@ -342,15 +347,15 @@ fi
 export CI=true
 testsOutputLog="$workingDir/$resultsFolder/tests.log"
 cd "$workingDir/podman-desktop"
-echo "Installing dependencies storing yarn run output in: $testsOutputLog"
-yarn install --frozen-lockfile --network-timeout 180000 2>&1 | tee -a $testsOutputLog
+echo "Installing dependencies storing pnpm run output in: $testsOutputLog"
+pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
 if (( extTests == 0 )); then
     echo "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-    yarn "$npmTarget" 2>&1 | tee -a $testsOutputLog
+    pnpm "$npmTarget" 2>&1 | tee -a $testsOutputLog
     collect_logs "podman-desktop"
 else
     echo "Building podman-desktop for extension e2e tests"
-    yarn test:e2e:build 2>&1 | tee -a $testsOutputLog
+    pnpm test:e2e:build 2>&1 | tee -a $testsOutputLog
 fi
 
 ## run extension e2e tests
@@ -360,12 +365,12 @@ if (( extTests == 1 )); then
     if [ -d "$workingDir/$extRepo/tests/playwright" ]; then
         cd tests/playwright
     fi
-    yarn add -D @podman-desktop/tests-playwright@next
+    pnpm add -D @podman-desktop/tests-playwright@next
     cd "$workingDir/$extRepo"
     echo "Installing dependencies of $extRrepo"
-    yarn install --frozen-lockfile --network-timeout 180000 2>&1 | tee -a $testsOutputLog
+    pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
     echo "Running the e2e playwright tests using target: $npmTarget"
-    yarn $npmTarget 2>&1 | tee -a $testsOutputLog
+    pnpm $npmTarget 2>&1 | tee -a $testsOutputLog
     ## Collect results
     collect_logs $extRepo
 fi

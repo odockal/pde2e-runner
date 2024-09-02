@@ -157,6 +157,10 @@ function Load-Secrets() {
 function Collect-Logs($folder) {
     mkdir -p "$workingDir\$resultsFolder\$folder"
     $target="$workingDir\$resultsFolder\$folder"
+    if ($extTests -eq "1") {
+        write-host "Clean up models files..."
+        Get-ChildItem -Path "$workingDir\$folder" *.gguf -Recurse | foreach { Remove-Item -Path $_.FullName }
+    }
     write-host "Collecting the results into: " $target
     Copy-Exists $workingDir\$folder\output.log $target
     Copy-Exists $workingDir\$folder\tests\output\* $target
@@ -171,6 +175,8 @@ function Collect-Logs($folder) {
 
 # Execution beginning
 Write-Host "Podman desktop E2E runner script is being run..."
+$actualUser=whoami
+Write-Host "Whoami: $actualUser"
 
 write-host "Switching to a target folder: " $targetFolder
 cd $targetFolder
@@ -215,7 +221,7 @@ if (!$pdPath)
 # Install or put the tool on the path, path is regenerated 
 if (-not (Command-Exists "node -v")) {
     # Download and install the latest version of Node.js
-    write-host "Installing node"
+    write-host "Installing node from https://nodejs.org/dist/$nodejsLatestVersion/node-$nodejsLatestVersion-win-x64.zip"
     # $nodejsLatestVersion = (Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' | Sort-Object -Property version -Descending)[0].version
     if (-not (Test-Path -Path "$toolsInstallDir\node-$nodejsLatestVersion-win-x64" -PathType Container)) {
         Invoke-WebRequest -Uri "https://nodejs.org/dist/$nodejsLatestVersion/node-$nodejsLatestVersion-win-x64.zip" -OutFile "$toolsInstallDir\nodejs.zip"
@@ -223,14 +229,14 @@ if (-not (Command-Exists "node -v")) {
     }
     $env:Path += ";$toolsInstallDir\node-$nodejsLatestVersion-win-x64"
 }
-# verify node, npm, yarn installation
+# verify node, npm, pnpm installation
 node -v
 npm -v
 
-# Install Yarn
-write-host "Installing yarn"
-npm install -g yarn
-yarn --version
+# Install pnpm
+write-host "Installing pnpm"
+npm install -g pnpm
+pnpm --version
 
 # GIT clone and checkout part
 if (-not (Command-Exists "git version")) {
@@ -309,18 +315,18 @@ if ($extTests -eq "1") {
     $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
 }
 
-## YARN INSTALL AND TEST PART PODMAN-DESKTOP
+## pnpm INSTALL AND TEST PART PODMAN-DESKTOP
 cd "$workingDir\podman-desktop"
 write-host "Installing dependencies of podman-desktop"
-yarn install --frozen-lockfile --network-timeout 180000 2>&1 | Tee-Object -FilePath 'output.log' -Append
+pnpm install --frozen-lockfile 2>&1 | Tee-Object -FilePath 'output.log' -Append
 if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-    yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     ## Collect results
     Collect-Logs "podman-desktop"
 } else {
     write-host "Building podman-desktop to run e2e from extension repo"
-    yarn test:e2e:build 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    pnpm test:e2e:build 2>&1 | Tee-Object -FilePath 'output.log' -Append
 }
 
 ## run extension e2e tests
@@ -330,12 +336,12 @@ if ($extTests -eq "1") {
     if (Test-Path "$workingDir\$extRepo\tests\playwright") {
         cd tests/playwright
     }
-    yarn add -D @podman-desktop/tests-playwright@next
+    pnpm add -D @podman-desktop/tests-playwright@next
     cd "$workingDir\$extRepo"
     write-host "Installing dependencies of $repo"
-    yarn install --frozen-lockfile --network-timeout 180000 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    pnpm install --frozen-lockfile 2>&1 | Tee-Object -FilePath 'output.log' -Append
     write-host "Running the e2e playwright tests using target: $npmTarget"
-    yarn $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     ## Collect results
     Collect-Logs $extRepo
 }
