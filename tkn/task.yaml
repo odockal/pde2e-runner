@@ -95,7 +95,7 @@ spec:
     default: "''"
   - name: save-traces
     description: Whether to save playwright trace files
-    default: '0'
+    default: '1'
   - name: clean-machine
     description: Whether to run podman machine reset
     default: '1'

@@ -23,7 +23,7 @@ start=0
 rootful=0
 envVars=""
 podmanProvider=""
-saveTraces=0
+saveTraces=1
 cleanMachine=1
 
 while [[ $# -gt 0 ]]; do
