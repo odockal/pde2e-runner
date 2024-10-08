@@ -115,13 +115,6 @@ function Load-Variables() {
     } else {
         Write-Host "Input string is empty."
     }
-
-    # Set custom podman provider (wsl vs. hyperv)
-    if (-not [string]::IsNullOrWhiteSpace($podmanProvider)) {
-        Write-Host "Setting CONTAINERS_MACHINE_PROVIDER: '$podmanProvider'"
-        Set-Item -Path "env:CONTAINERS_MACHINE_PROVIDER" -Value $podmanProvider
-        $global:scriptEnvVars += CONTAINERS_MACHINE_PROVIDER
-    }
 }
 
 # Loading a secrets into env. vars from the file
@@ -162,6 +155,9 @@ function Collect-Logs($folder) {
         Get-ChildItem -Path "$workingDir\$folder" *.gguf -Recurse | foreach { Remove-Item -Path $_.FullName }
     }
     write-host "Collecting the results into: " $target
+    Copy-Exists $workingDir\$folder\stdout.txt $target
+    Copy-Exists $workingDir\$folder\stderr.txt $target
+    Copy-Exists $workingDir\$folder\tmp_script.ps1 $target
     Copy-Exists $workingDir\$folder\output.log $target
     Copy-Exists $workingDir\$folder\tests\output\* $target
     Copy-Exists $workingDir\$folder\tests\playwright\output\* $target
@@ -170,6 +166,107 @@ function Collect-Logs($folder) {
     if (Test-Path "$target\traces\raw") {
         write-host "Removing raw playwright trace files"
         rm -r "$target\traces\raw"
+    }
+}
+
+function Invoke-Admin-Command {
+    param (
+        [string]$Command,            # Command to run (e.g., "pnpm install")
+        [string]$WorkingDirectory,   # Working directory where the command should be executed
+        [string]$TargetFolder,       # Target directory for storing the output/log files
+        [string]$EnvVarName="",      # Environment variable name (optional)
+        [string]$EnvVarValue="",     # Environment variable value (optional)
+        [string]$Privileged='0',     # Whether to run command with admin rights, defaults to user mode,
+        [int]$WaitTimeout=300,     # Default WaitTimeout 300 s, defines the timeout to wait for command execute
+        [bool]$WaitForCommand=$true  # Wait for command execution indefinitely, default true, use timeout otherwise
+    )
+
+    cd $WorkingDirectory
+    # Define file paths to capture output and error
+    $outputFile = Join-Path -Path $WorkingDirectory -ChildPath "tmp_stdout_$([System.Datetime]::Now.ToString("yyyymmdd_HHmmss")).txt"
+    $errorFile = Join-Path -Path $WorkingDirectory -ChildPath "tmp_stderr_$([System.Datetime]::Now.ToString("yyyymmdd_HHmmss")).txt"
+    $tempScriptFile = Join-Path -Path $WorkingDirectory -ChildPath "tmp_script_$([System.Datetime]::Now.ToString("yyyymmdd_HHmmss")).ps1"
+
+    # We need to create a local tmp script in order to execute it with admin rights with a Start-Process
+    # We also want a access to the stdout and stderr which is not possible otherwise
+    if ($Privileged -eq "1") {
+        # Create the temporary script content
+        $scriptContent = @"
+# Change to the working directory
+Set-Location -Path '$WorkingDirectory'
+
+"@
+        # If the environment variable name and value are provided, add to script
+        if (![string]::IsNullOrWhiteSpace($EnvVarName) -and ![string]::IsNullOrWhiteSpace($EnvVarValue)) {
+            $scriptContent += @"
+# Set the environment variable
+Set-Item -Path Env:\$EnvVarName -Value '$EnvVarValue'
+
+"@
+        }
+        # Add the command execution to the script
+        $scriptContent += @"
+# Run the command and redirect stdout and stderr
+# Try running the command and capture errors
+try {
+    'Executing Command: $Command' | Out-File '$outputFile' -Append
+    $Command >> '$outputFile' 2>> '$errorFile'
+    'Command executed successfully.' | Out-File '$outputFile' -Append
+} catch {
+    'Error occurred while executing command: ' + `$_.Exception.Message | Out-File '$errorFile' -Append
+}
+"@
+        # Write the script content to the temporary script file
+        write-host "Creating a content of the script:"
+        write-host "$scriptContent"
+        write-host "Storing at: $tempScriptFile"
+        $scriptContent | Set-Content -Path $tempScriptFile
+
+        # Start the process as admin and run the temporary script file
+        $process = Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy Bypass", "-File", $tempScriptFile -Verb RunAs -PassThru
+        $waitResult = $null
+        if ($WaitForCommand) {
+            write-host "Starting process with script awaiting until it is finished..."
+            $waitResult = $process.WaitForExit()
+        } else {
+            write-host "Starting process with script awaiting for $WaitTimeout sec"
+            $waitResult = $process.WaitForExit($WaitTimeout * 1000)
+        }
+        Write-Host "Process ID: $($process.Id)"
+        if ($waitResult) {
+            Write-Host "Process completed waiting successfully."
+        } else {
+            Write-Host "Process failed waiting after with exit code: $($process.ExitCode)"
+        }
+
+    } else {
+        cd $WorkingDirectory
+        # Run the command normally without elevated privileges
+        if (![string]::IsNullOrWhiteSpace($EnvVarName) -and ![string]::IsNullOrWhiteSpace($EnvVarValue)) {
+            "Settings Env. Var.: $EnvVarName = $EnvVarValue" | Out-File $outputFile -Append
+            Set-Item -Path Env:\$EnvVarName -Value $EnvVarValue
+        }
+        Set-Location -Path '$WorkingDirectory'
+        "Running the command: '$Command' in non privileged mode" | Out-File $outputFile -Append
+        $output = Invoke-Expression $Command >> $outputFile 2>> $errorFile
+    }
+
+    # Copying logs and scripts back to the target folder (to get preserved and copied to the host)
+    Copy-Item -Path $tempScriptFile -Destination $TargetFolder
+    Copy-Item -Path $outputFile -Destination $TargetFolder
+    Copy-Item -Path $errorFile -Destination $TargetFolder
+
+    # After the process finishes, read the output and error from the files
+    if (Test-Path $outputFile) {
+        Write-Output "Standard Output: $(Get-Content -Path $outputFile)"
+    } else {
+        Write-Output "No standard output..."
+    }
+
+    if (Test-Path $errorFile) {
+        Write-Output "Standard Error: $(Get-Content -Path $errorFile)"
+    } else {
+        Write-Output "No standard error..."
     }
 }
 
@@ -221,13 +318,19 @@ if (!$pdPath)
 # Install or put the tool on the path, path is regenerated 
 if (-not (Command-Exists "node -v")) {
     # Download and install the latest version of Node.js
-    write-host "Installing node from https://nodejs.org/dist/$nodejsLatestVersion/node-$nodejsLatestVersion-win-x64.zip"
+    write-host "Installing node"
     # $nodejsLatestVersion = (Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' | Sort-Object -Property version -Descending)[0].version
     if (-not (Test-Path -Path "$toolsInstallDir\node-$nodejsLatestVersion-win-x64" -PathType Container)) {
         Invoke-WebRequest -Uri "https://nodejs.org/dist/$nodejsLatestVersion/node-$nodejsLatestVersion-win-x64.zip" -OutFile "$toolsInstallDir\nodejs.zip"
         Expand-Archive -Path "$toolsInstallDir\nodejs.zip" -DestinationPath $toolsInstallDir
     }
-    $env:Path += ";$toolsInstallDir\node-$nodejsLatestVersion-win-x64"
+    # we need to set node for local access in actually running script
+    $env:Path += ";$toolsInstallDir\node-$nodejsLatestVersion-win-x64\"
+    # Setting node to be available for the machine scope
+    # requires admin access
+    $command="[Environment]::SetEnvironmentVariable('Path', (`$Env:Path + ';$toolsInstallDir\node-$nodejsLatestVersion-win-x64\'), 'MACHINE')"
+    Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy Bypass", "-Command $command" -Verb RunAs -Wait
+    write-host "$([Environment]::GetEnvironmentVariable('Path', 'MACHINE'))"
 }
 # verify node, npm, pnpm installation
 node -v
@@ -250,24 +353,44 @@ if (-not (Command-Exists "git version")) {
 }
 
 if (-not (Command-Exists "podman")) {
-    # Download and install the nightly podman for windows
-    Write-host "Podman is not installed..."
-    if ($podmanPath) {
-        write-host "Content of the $podmanPath"
-        $items = Get-ChildItem -Path $myPath
-        foreach ($item in $items) {
-            Write-Host $item.FullName
-        }
-        write-host "Settings podman binary location to PATH"
+    if (Test-Path -Path $podmanPath) {
+        write-host "Adding Podman location: $podmanPath, on the User PATH"
+        #[System.Environment]::SetEnvironmentVariable('PATH', ([System.Environment]::GetEnvironmentVariable('PATH', 'User') + $podmanPath) -join ';', 'User')
         $env:Path += ";$podmanPath"
+        # Make the podman available for the every scope (by using Machine scope)
+        # write-host "Settings $podmanPath on PATH with Machine scope"
+        # $command="[Environment]::SetEnvironmentVariable('Path', (`$Env:Path + ';$podmanPath'), 'MACHINE')"
+        # Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy Bypass", "-Command $command" -Verb RunAs -Wait
+        # write-host "$([Environment]::GetEnvironmentVariable('Path', 'MACHINE'))"
+    } else {
+        Write-Host "The path $podmanPath does not exist, verify downloadUrl and version"
+        Throw "Expected Podman Path: $podmanPath does not exist"
     }
 }
 
 # Test podman version installed
 podman -v
 
+# Set custom podman provider (wsl vs. hyperv)
+if (-not [string]::IsNullOrWhiteSpace($podmanProvider)) {
+    Write-Host "Setting CONTAINERS_MACHINE_PROVIDER: '$podmanProvider'"
+    Set-Item -Path "env:CONTAINERS_MACHINE_PROVIDER" -Value $podmanProvider
+    $global:scriptEnvVars += "CONTAINERS_MACHINE_PROVIDER"
+}
+
+# If the provider is hyperv, we need to allow podman in defender's firewall
+if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+    write-host "Enable podman (with hyperv) to send and receive requests through the firewall"
+    $commandPath=$(get-command podman).Path
+    $inbound="New-NetFirewallRule -DisplayName 'podman' -Direction Inbound -Program $commandPath -Action Allow -Profile Private"
+    $outbound="New-NetFirewallRule -DisplayName 'podman' -Direction Outbound -Program $commandPath -Action Allow -Profile Private"
+    Start-Process powershell -verb runas -ArgumentList $inbound -wait
+    Start-Process powershell -verb runas -ArgumentList $outbound -wait
+}
+
 # Setup podman machine in the host system
 if ($initialize -eq "1") {
+    $thisDir=$(pwd)
     $flags = ""
     if ($rootful -eq "1") {
         $flags += "--rootful "
@@ -283,16 +406,43 @@ if ($initialize -eq "1") {
     if($flags) {
         # If more flag will be necessary, we have to consider composing the command other way
         # ie. https://stackoverflow.com/questions/6604089/dynamically-generate-command-line-command-then-invoke-using-powershell
-        podman machine init $flagsArray >> $logFile
+        if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+            Write-Host "Initialize HyperV podman machine with flags ..."
+            Invoke-Admin-Command -Command "podman machine init $flags" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation
+        } else {
+            podman machine init $flagsArray >> $logFile
+        }
     } else {
-        podman machine init >> $logFile
+        if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+            Write-Host "Initialize HyperV podman machine ..."
+            Invoke-Admin-Command -Command "podman machine init" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation
+        } else {
+            podman machine init >> $logFile
+        }
     }
     if ($start -eq "1") {
-        write-host "Starting podman machine..."
-        "podman machine start" >> $logfile
-        podman machine start >> $logFile
+        if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+            Write-Host "Starting HyperV Podman Machine ..."
+            Invoke-Admin-Command -Command "podman machine start" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation -WaitForCommand $false
+        } else {
+            write-host "Starting podman machine..."
+            "podman machine start" >> $logFile
+            podman machine start >> $logFile
+        }
     }
-    podman machine ls --format json >> $logFile
+    if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+        Write-Host "List HyperV Podman Machine ..."
+        Invoke-Admin-Command -Command "podman machine ls" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation
+    } else {
+        podman machine ls >> $logFile
+    }
+
+    ## Podman Machine smoke tests
+    # the tests expect podman machine to be up
+    if ($smokeTests -eq "1") {
+        $testsLogFile = "$workingDir\$resultsFolder\podman-machine-tests.log"
+        # TODO: include basic tests for podman machine verification 
+    }
 }
 
 
@@ -316,12 +466,18 @@ if ($extTests -eq "1") {
 }
 
 ## pnpm INSTALL AND TEST PART PODMAN-DESKTOP
-cd "$workingDir\podman-desktop"
+$thisDir="$workingDir\podman-desktop"
+cd $thisDir
 write-host "Installing dependencies of podman-desktop"
 pnpm install --frozen-lockfile 2>&1 | Tee-Object -FilePath 'output.log' -Append
 if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-    pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+        Write-Host "Running tests with hyperv with admin privileges"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation -WaitForCommand $false -WaitTimeout 3600
+    } else {
+        pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    }
     ## Collect results
     Collect-Logs "podman-desktop"
 } else {
@@ -331,7 +487,8 @@ if ($extTests -ne "1") {
 
 ## run extension e2e tests
 if ($extTests -eq "1") {
-    cd "$workingDir\$extRepo"
+    $thisDir="$workingDir\$extRepo"
+    cd $thisDir
     write-host "Add latest version of the @podman-desktop/tests-playwright into right package.json"
     if (Test-Path "$workingDir\$extRepo\tests\playwright") {
         cd tests/playwright
@@ -341,7 +498,12 @@ if ($extTests -eq "1") {
     write-host "Installing dependencies of $repo"
     pnpm install --frozen-lockfile 2>&1 | Tee-Object -FilePath 'output.log' -Append
     write-host "Running the e2e playwright tests using target: $npmTarget"
-    pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+        Write-Host "Running tests with hyperv with admin privileges"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation -WaitForCommand $false -WaitTimeout 3600
+    } else {
+        pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    }
     ## Collect results
     Collect-Logs $extRepo
 }
