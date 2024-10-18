@@ -44,6 +44,7 @@ $nodejsLatestVersion = "v20.11.1"
 $gitVersion = '2.42.0.2'
 
 $global:scriptEnvVars = @()
+$global:envVarDefs = @()
 
 function Download-PD {
     Write-Host "Downloading Podman Desktop from $pdUrl"
@@ -97,6 +98,7 @@ function Load-Variables() {
 
         foreach ($variable in $variables) {
             # Split each variable definition
+            $global:envVarDefs += $variable
             $parts = $variable -split '=', 2
             Write-Host "Processing $variable"
 
@@ -202,9 +204,33 @@ Set-Location -Path '$WorkingDirectory'
             $scriptContent += @"
 # Set the environment variable
 Set-Item -Path Env:\$EnvVarName -Value '$EnvVarValue'
-
 "@
         }
+        
+        # If we have a set of env. vars. provided, add this code to script
+        if (![string]::IsNullOrWhiteSpace($global:envVarDefs) -and ![string]::IsNullOrWhiteSpace($global:envVarDefs)) {
+            Write-Host "Parsing Global Input env. vars in inline script: '$global:envVarDefs'"
+            foreach ($definition in $global:envVarDefs) {
+                # Split each variable definition
+                Write-Host "Processing $definition"
+                $parts = $definition -split '=', 2
+
+                # Check if the variable assignment is in VAR=Value format
+                if ($parts.Count -eq 2) {
+                    $name = $parts[0].Trim()
+                    $value = $parts[1].Trim('"')
+
+                    # Set and test the environment variable
+                    $scriptContent += @"
+# Set the environment variable from array
+Set-Item -Path Env:\$name -Value '$value'
+"@
+                } else {
+                    Write-Host "Invalid variable assignment: $definition"
+                }
+            }
+        }
+
         # Add the command execution to the script
         $scriptContent += @"
 # Run the command and redirect stdout and stderr
