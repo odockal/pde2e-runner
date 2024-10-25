@@ -23,6 +23,8 @@ param(
     $extTests='0',
     [Parameter(HelpMessage = 'Podman Installation path - bin directory')]
     [string]$podmanPath = "",
+    [Parameter(HelpMessage = 'Build Podman Desktop as binary instead of source repo')]
+    $buildBinary='0',
     [Parameter(HelpMessage = 'Initialize podman machine, default is 0/false')]
     $initialize='0',
     [Parameter(HelpMessage = 'Start Podman machine, default is 0/false')]
@@ -488,7 +490,7 @@ if($podmanDesktopBinary) {
 # Setup CI env. var.
 $env:CI = $true
 
-if ($extTests -eq "1") {
+if ($extTests -eq "1" && $buildBinary -eq "0") {
     $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
 }
 
@@ -509,7 +511,16 @@ if ($extTests -ne "1") {
     Collect-Logs "podman-desktop"
 } else {
     write-host "Building podman-desktop to run e2e from extension repo"
-    pnpm test:e2e:build 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    if ($buildBinary -eq "1") {
+        write-host "Building podman-desktop as binary"
+        $env:ELECTRON_ENABLE_INSPECT = "true"
+        pnpm compile --win nsis 2>&1 | Tee-Object -FilePath 'output.log' -Append
+        $podmanDesktopBinary="$workingDir\podman-desktop\dist\win-unpacked\Podman Desktop.exe"
+        $env:PODMAN_DESKTOP_BINARY="$podmanDesktopBinary";
+    } else {
+        write-host "Building podman-desktop as source"
+        pnpm test:e2e:build 2>&1 | Tee-Object -FilePath 'output.log' -Append
+    }
 }
 
 ## run extension e2e tests
