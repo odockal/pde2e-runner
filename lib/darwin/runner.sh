@@ -338,9 +338,7 @@ fi
 
 if [ -n "$podmanDesktopBinary" ]; then
     export PODMAN_DESKTOP_BINARY="$podmanDesktopBinary"
-fi
-
-if (( extTests == 1 )); then
+elif (( extTests == 1 )); then
     export PODMAN_DESKTOP_ARGS="$workingDir/podman-desktop"
 fi
 

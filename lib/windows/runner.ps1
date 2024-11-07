@@ -480,17 +480,15 @@ if ($extTests -eq "1") {
     Clone-Checkout $extRepo $extFork $extBranch
 }
 
-# Set PDOMAN_DESKTOP_BINARY if exists
+# Set PODMAN_DESKTOP_BINARY if exists
 if($podmanDesktopBinary) {
     $env:PODMAN_DESKTOP_BINARY="$podmanDesktopBinary";
+} elseif ($extTests -eq "1") {
+    $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
 }
 
 # Setup CI env. var.
 $env:CI = $true
-
-if ($extTests -eq "1") {
-    $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
-}
 
 ## pnpm INSTALL AND TEST PART PODMAN-DESKTOP
 $thisDir="$workingDir\podman-desktop"
