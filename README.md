@@ -23,7 +23,8 @@ podman run --rm -d --name pde2e-runner-run \
           -e OUTPUT_FOLDER=/data \
           -e DEBUG=true \
           -v $PWD:/data:z \
-          quay.io/odockal/pde2e-runner:v0.0.1-windows  \
+          -v $PWD/secrets.txt:/opt/pde2e-runner/secrets.txt:z \
+          quay.io/odockal/pde2e-runner:v0.0.3-windows  \
             pd-e2e-runner/runner.ps1 \
             -targetFolder pd-e2e-runner \
             -resultsFolder results \
@@ -34,7 +35,9 @@ podman run --rm -d --name pde2e-runner-run \
             -initialize 0 \
             -rootful 1 \
             -start 1 \
-            -installWSL 0
+            -envVars 'TEST_MACHINE=true,MY_ENV_VAR="some string",ENV_NUMBER=3' \
+            -secretFile secrets.txt \
+            -scriptPaths 'podman_rootless.ps1,setup_compose.ps1'
 
 # Running the image on Mac OS
 podman run --rm -d --name pde2e-runner-run \

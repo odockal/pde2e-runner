@@ -36,7 +36,9 @@ param(
     [Parameter(HelpMessage = 'Environmental variable to define custom podman Provider')]
     [string]$podmanProvider='',
     [Parameter(HelpMessage = 'Path to a secret file')]
-    [string]$secretFile=''
+    [string]$secretFile='',
+    [Parameter(HelpMessage = 'Scripts file names available on the image to execute, under scripts folder, divided with comma')]
+    $scriptPaths=''
 )
 
 # Program Versions
@@ -116,6 +118,31 @@ function Load-Variables() {
         }
     } else {
         Write-Host "Input string is empty."
+    }
+}
+
+# download and execute arbitrary script on the host
+function Execute-Scripts() {
+    Write-Host "Loading Paths passed into image"
+    Write-Host "ScriptPaths String: '$scriptPaths'"
+    # Check if the input string is not null or empty
+    if (-not [string]::IsNullOrWhiteSpace($scriptPaths)) {
+        $scriptsFolder="$resourcesPath"
+        # Split the input using comma separator
+        $paths = $scriptPaths -split ','
+
+        foreach ($path in $paths) {
+            $path = $path.Trim()
+            # Split each variable definition
+            Write-Host "Processing $path"
+            $scriptPath="$scriptsFolder\$path"
+            if (Test-Path $scriptPath) {
+                write-host "Executing $scriptPath"
+                & "$scriptPath"
+            } else {
+                write-host "$scriptPath does not exist"
+            }
+        }
     }
 }
 
@@ -312,6 +339,9 @@ write-host "Working location: " $workingDir
 # Capture resources path location
 $resourcesPath=$workingDir
 
+# Location for arbitrary scripts
+$scriptsPath = Join-Path $workingDir 'scripts'
+
 # Specify the user profile directory
 $userProfile = $env:USERPROFILE
 
@@ -490,11 +520,16 @@ if($podmanDesktopBinary) {
 # Setup CI env. var.
 $env:CI = $true
 
-## pnpm INSTALL AND TEST PART PODMAN-DESKTOP
+# Execute the arbitrary code from external source
+Execute-Scripts
+
+# pnpm INSTALL AND TEST PART PODMAN-DESKTOP
 $thisDir="$workingDir\podman-desktop"
 cd $thisDir
 write-host "Installing dependencies of podman-desktop"
 pnpm install --frozen-lockfile 2>&1 | Tee-Object -FilePath 'output.log' -Append
+
+# Running the e2e tests
 if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
