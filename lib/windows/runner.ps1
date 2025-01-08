@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory,HelpMessage='Results folder')]
     $resultsFolder="results",
     [Parameter(HelpMessage = 'Podman Desktop Fork')]
-    [string]$fork = "containers",
+    [string]$fork = "podman-desktop",
     [Parameter(HelpMessage = 'Podman Desktop Branch')]
     [string]$branch = "main",
     [Parameter(HelpMessage = 'Extension repo')]

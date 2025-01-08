@@ -50,16 +50,16 @@ spec:
     default: "''"
   - name: fork
     description: Podman Desktop repo fork
-    default: 'containers'
+    default: 'podman-desktop'
   - name: branch
     description: Podman Desktop repository branch or tag to checkout
     default: 'main'
   - name: ext-repo
     description: Podman Desktop Extension repo name
-    default: 'podman-desktop-extension-bootc'
+    default: 'extension-bootc'
   - name: ext-fork
     description: Podman Desktop extension repo fork
-    default: 'containers'
+    default: 'podman-desktop'
   - name: ext-branch
     description: Podman Desktop repository branch or tag to checkout
     default: 'main'

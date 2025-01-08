@@ -10,11 +10,11 @@ pdUrl=""
 pdPath=""
 targetFolder=""
 resultsFolder="results"
-fork="containers"
+fork="podman-desktop"
 branch="main"
 extTests=0
-extRepo="podman-desktop-extension-bootc"
-extFork="containers"
+extRepo="extension-bootc"
+extFork="podman-desktop"
 extBranch="main"
 npmTarget="test:e2e"
 podmanPath=""
@@ -22,6 +22,7 @@ initialize=0
 start=0
 rootful=0
 envVars=""
+secretFile=""
 podmanProvider=""
 saveTraces=1
 cleanMachine=1
@@ -95,27 +96,31 @@ function load_variables() {
 
 # Loading a secrets into env. vars from the file
 function load_secrets() {
-    secretFilePath="$resourcesPath/$secretFile"
-    if [ -f $secretFilePath ]; then
-        echo "Loading Secrets from file: $secretFilePath"
-        if [ -f "$secretFilePath" ]; then
-            while IFS='=' read -r key value || [ -n "$key" ]; do
-                # Ignore comments and empty lines
-                if [[ ! $key =~ ^\s*# && -n $key ]]; then
-                    # Trim leading and trailing whitespaces
-                    key=$(echo "$key" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                    value=$(echo "$value" | sed 's/^[ \t]*//;s/[ \t]*$//')
-                    # Set the environment variable
-                    export "$key"="$value"
-                    script_env_vars+=("$key")
-                fi
-            done < "$secretFilePath"
-            echo "Secrets loaded from '$secretFilePath' and set as environment variables."
+    if [ -n "$secretFile" ]; then
+        secretFilePath="$resourcesPath/$secretFile"
+        if [ -f $secretFilePath ]; then
+            echo "Loading Secrets from file: $secretFilePath"
+            if [ -f "$secretFilePath" ]; then
+                while IFS='=' read -r key value || [ -n "$key" ]; do
+                    # Ignore comments and empty lines
+                    if [[ ! $key =~ ^\s*# && -n $key ]]; then
+                        # Trim leading and trailing whitespaces
+                        key=$(echo "$key" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        value=$(echo "$value" | sed 's/^[ \t]*//;s/[ \t]*$//')
+                        # Set the environment variable
+                        export "$key"="$value"
+                        script_env_vars+=("$key")
+                    fi
+                done < "$secretFilePath"
+                echo "Secrets loaded from '$secretFilePath' and set as environment variables."
+            else
+                echo "File '$secretFilePath' not found."
+            fi
         else
-            echo "File '$secretFilePath' not found."
+            echo "Secret File path $secretFilePath does not exist"
         fi
-    else
-        echo "Secret File does not exist on $secretFilePath"
+    else 
+        echo "Secret file Parameter not set"
     fi
 }
 
