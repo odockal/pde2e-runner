@@ -93,6 +93,11 @@ function Clone-Checkout($repo, $fork, $branch) {
 function Load-Variables() {
     Write-Host "Loading Variables passed into image"
     Write-Host "Input String: '$envVars'"
+
+    write-host "Setting default env. var.: CI=true"
+    Set-Item -Path "env:CI" -Value $true
+    $global:scriptEnvVars += "CI"
+    $global:envVarDefs += 'CI=true'
     # Check if the input string is not null or empty
     if (-not [string]::IsNullOrWhiteSpace($envVars)) {
         # Split the input using comma separator
@@ -119,9 +124,7 @@ function Load-Variables() {
     } else {
         Write-Host "Input string is empty."
     }
-    write-host "Setting default env. var.: CI=true"
-    Set-Item -Path "env:CI" -Value $true
-    $global:scriptEnvVars += "CI"
+
 }
 
 # download and execute arbitrary script on the host
@@ -235,6 +238,7 @@ Set-Location -Path '$WorkingDirectory'
             $scriptContent += @"
 # Set the environment variable
 Set-Item -Path Env:\$EnvVarName -Value '$EnvVarValue'
+
 "@
         }
         
