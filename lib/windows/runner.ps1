@@ -119,6 +119,9 @@ function Load-Variables() {
     } else {
         Write-Host "Input string is empty."
     }
+    write-host "Setting default env. var.: CI=true"
+    Set-Item -Path "env:CI" -Value $true
+    $global:scriptEnvVars += "CI"
 }
 
 # download and execute arbitrary script on the host
@@ -365,10 +368,11 @@ Write-Host "Whoami: $actualUser"
 
 write-host "Switching to a target folder: " $targetFolder
 cd $targetFolder
-write-host "Create a resultsFolder in targetFolder: $resultsFolder"
+write-host "Create a $resultsFolder in targetFolder"
 mkdir -p $resultsFolder
 $workingDir=Get-Location
 write-host "Working location: " $workingDir
+$targetLocation="$workingDir\$resultsFolder"
 
 # Capture resources path location
 $resourcesPath=$workingDir
@@ -376,8 +380,8 @@ $resourcesPath=$workingDir
 # Location for arbitrary scripts
 $scriptsPath = Join-Path $workingDir 'scripts'
 
-# define targetLocationTmpScp for temporary script files
-$targetLocationTmpScp="$workingDir\$resultsFolder\scripts"
+# define targetLocationTmpScp for temporary script files and outputs
+$targetLocationTmpScp="$targetLocation\scripts"
 New-Item -ErrorAction Ignore -ItemType directory -Path $targetLocationTmpScp
 
 # Specify the user profile directory
@@ -554,9 +558,6 @@ if($podmanDesktopBinary) {
 } elseif ($extTests -eq "1") {
     $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
 }
-
-# Setup CI env. var.
-$env:CI = $true
 
 # Execute the arbitrary code from external source
 Execute-Scripts
