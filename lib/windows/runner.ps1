@@ -207,6 +207,7 @@ function Invoke-Admin-Command {
         [string]$EnvVarName="",      # Environment variable name (optional)
         [string]$EnvVarValue="",     # Environment variable value (optional)
         [string]$Privileged='0',     # Whether to run command with admin rights, defaults to user mode,
+        [string]$SetSecrets='0',     # Whether to process secret file and load it as env. vars., only in privileged mode,
         [int]$WaitTimeout=300,     # Default WaitTimeout 300 s, defines the timeout to wait for command execute
         [bool]$WaitForCommand=$true  # Wait for command execution indefinitely, default true, use timeout otherwise
     )
@@ -235,7 +236,7 @@ Set-Item -Path Env:\$EnvVarName -Value '$EnvVarValue'
         }
         
         # If we have a set of env. vars. provided, add this code to script
-        if (![string]::IsNullOrWhiteSpace($global:envVarDefs) -and ![string]::IsNullOrWhiteSpace($global:envVarDefs)) {
+        if (![string]::IsNullOrWhiteSpace($global:envVarDefs)) {
             Write-Host "Parsing Global Input env. vars in inline script: '$global:envVarDefs'"
             foreach ($definition in $global:envVarDefs) {
                 # Split each variable definition
@@ -251,10 +252,42 @@ Set-Item -Path Env:\$EnvVarName -Value '$EnvVarValue'
                     $scriptContent += @"
 # Set the environment variable from array
 Set-Item -Path Env:\$name -Value '$value'
+
 "@
                 } else {
                     Write-Host "Invalid variable assignment: $definition"
                 }
+            }
+        }
+
+        # Add secrets handling into tmp script
+        if ($SetSecrets -eq "1") {
+            Write-Host "SetSecrets flag is set"
+            if ($secretFile) {
+                Write-Host "SecretFile is defined and found..."
+$scriptContent += @"
+`$secretFilePath="$resourcesPath\$secretFile"
+if (Test-Path `$secretFilePath) {
+    `$properties = Get-Content `$secretFilePath | ForEach-Object {
+        # Ignore comments and empty lines
+        if (-not `$_.StartsWith("#") -and -not [string]::IsNullOrWhiteSpace(`$_)) {
+            # Split each line into key-value pairs
+            `$key, `$value = `$_ -split '=', 2
+
+            # Trim leading and trailing whitespaces
+            `$key = `$key.Trim()
+            `$value = `$value.Trim()
+
+            # Set the environment variable
+            Set-Item -Path "env:`$key" -Value `$value
+        }
+    }
+    Write-Host "Secrets loaded from '`$secretFilePath' and set as environment variables."
+} else {
+    Write-Host "File '`$secretFilePath' not found."
+}
+
+"@
             }
         }
 
@@ -269,6 +302,7 @@ try {
 } catch {
     'Error occurred while executing command: ' + `$_.Exception.Message | Out-File '$errorFile' -Append
 }
+
 "@
         # Write the script content to the temporary script file
         write-host "Creating a content of the script:"
@@ -306,9 +340,9 @@ try {
     }
 
     # Copying logs and scripts back to the target folder (to get preserved and copied to the host)
-    Copy-Item -Path $tempScriptFile -Destination $TargetFolder
-    Copy-Item -Path $outputFile -Destination $TargetFolder
-    Copy-Item -Path $errorFile -Destination $TargetFolder
+    cp $tempScriptFile $TargetFolder
+    cp $outputFile $TargetFolder
+    cp $errorFile $TargetFolder
 
     # After the process finishes, read the output and error from the files
     if (Test-Path $outputFile) {
@@ -342,6 +376,10 @@ $resourcesPath=$workingDir
 # Location for arbitrary scripts
 $scriptsPath = Join-Path $workingDir 'scripts'
 
+# define targetLocationTmpScp for temporary script files
+$targetLocationTmpScp="$workingDir\$resultsFolder\scripts"
+New-Item -ErrorAction Ignore -ItemType directory -Path $targetLocationTmpScp
+
 # Specify the user profile directory
 $userProfile = $env:USERPROFILE
 
@@ -360,9 +398,9 @@ Load-Secrets
 
 $podmanDesktopBinary=""
 
-if (!$pdPath)
+if ([string]::IsNullOrWhiteSpace($pdPath))
 {
-    if ($pdUrl) {
+    if (-not [string]::IsNullOrWhiteSpace($pdUrl)) {
         # set binary path
         Download-PD
         $podmanDesktopBinary="$workingDir\pd.exe"
@@ -410,8 +448,8 @@ if (-not (Command-Exists "git version")) {
 }
 
 if (-not (Command-Exists "podman")) {
-    if (Test-Path -Path $podmanPath) {
-        write-host "Adding Podman location: $podmanPath, on the User PATH"
+    if (Test-Path -Path "$podmanPath") {
+        write-host "Adding Podman location: '$podmanPath', on the User PATH"
         #[System.Environment]::SetEnvironmentVariable('PATH', ([System.Environment]::GetEnvironmentVariable('PATH', 'User') + $podmanPath) -join ';', 'User')
         $env:Path += ";$podmanPath"
         # Make the podman available for the every scope (by using Machine scope)
@@ -420,8 +458,8 @@ if (-not (Command-Exists "podman")) {
         # Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy Bypass", "-Command $command" -Verb RunAs -Wait
         # write-host "$([Environment]::GetEnvironmentVariable('Path', 'MACHINE'))"
     } else {
-        Write-Host "The path $podmanPath does not exist, verify downloadUrl and version"
-        Throw "Expected Podman Path: $podmanPath does not exist"
+        Write-Host "The path '$podmanPath' does not exist, verify downloadUrl and version"
+        Throw "Expected Podman Path: '$podmanPath' does not exist"
     }
 }
 
@@ -465,14 +503,14 @@ if ($initialize -eq "1") {
         # ie. https://stackoverflow.com/questions/6604089/dynamically-generate-command-line-command-then-invoke-using-powershell
         if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
             Write-Host "Initialize HyperV podman machine with flags ..."
-            Invoke-Admin-Command -Command "podman machine init $flags" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation
+            Invoke-Admin-Command -Command "podman machine init $flags" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp
         } else {
             podman machine init $flagsArray >> $logFile
         }
     } else {
         if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
             Write-Host "Initialize HyperV podman machine ..."
-            Invoke-Admin-Command -Command "podman machine init" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation
+            Invoke-Admin-Command -Command "podman machine init" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp
         } else {
             podman machine init >> $logFile
         }
@@ -480,7 +518,7 @@ if ($initialize -eq "1") {
     if ($start -eq "1") {
         if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
             Write-Host "Starting HyperV Podman Machine ..."
-            Invoke-Admin-Command -Command "podman machine start" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation -WaitForCommand $false
+            Invoke-Admin-Command -Command "podman machine start" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false
         } else {
             write-host "Starting podman machine..."
             "podman machine start" >> $logFile
@@ -489,7 +527,7 @@ if ($initialize -eq "1") {
     }
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "List HyperV Podman Machine ..."
-        Invoke-Admin-Command -Command "podman machine ls" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation
+        Invoke-Admin-Command -Command "podman machine ls" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp
     } else {
         podman machine ls >> $logFile
     }
@@ -534,7 +572,7 @@ if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "Running tests with hyperv with admin privileges"
-        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation -WaitForCommand $false -WaitTimeout 3600
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
     } else {
         pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     }
@@ -560,7 +598,7 @@ if ($extTests -eq "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget"
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "Running tests with hyperv with admin privileges"
-        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocation -WaitForCommand $false -WaitTimeout 3600
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
     } else {
         pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     }
@@ -574,8 +612,8 @@ foreach ($var in $scriptEnvVars) {
     Remove-Item -Path "env:\$var"
 }
 if ($secretFile) {
-    Write-Host "Remove secrets file $resourcesPath/$secretFile from the target"
-    Remove-Item -Path "$resourcesPath/$secretFile"
+    Write-Host "Remove secrets file $resourcesPath\$secretFile from the target"
+    Remove-Item -Path "$resourcesPath\$secretFile"
 }
 
 write-host "Script finished..."
