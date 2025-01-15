@@ -41,7 +41,7 @@ spec:
   # PDE2E Runner parameters
   - name: image-version
     description: pde2e-runner image version
-    default: '0.0.1'
+    default: '0.0.3'
   - name: pd-url
     description: in case we want to download a specific podman desktop version. We can set up the url
     default: "''"
