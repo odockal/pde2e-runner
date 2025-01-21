@@ -91,6 +91,7 @@ function load_variables() {
     if [ -n "$podmanProvider" ]; then
         echo "Settings CONTAINERS_MACHINE_PROVIDER: $podmanProvider"
         export CONTAINERS_MACHINE_PROVIDER=$podmanProvider
+        script_env_vars+=("CONTAINERS_MACHINE_PROVIDER")
     fi
 }
 

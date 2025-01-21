@@ -38,7 +38,9 @@ param(
     [Parameter(HelpMessage = 'Path to a secret file')]
     [string]$secretFile='',
     [Parameter(HelpMessage = 'Scripts file names available on the image to execute, under scripts folder, divided with comma')]
-    $scriptPaths=''
+    $scriptPaths='',
+    [Parameter(HelpMessage = 'Run tests as admin')]
+    $runAsAdmin = '0'
 )
 
 # Program Versions
@@ -578,6 +580,9 @@ if ($extTests -ne "1") {
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "Running tests with hyperv with admin privileges"
         Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
+    } elseif ($runAsAdmin -eq "1") {
+        Write-Host "Running tests with admin privileges"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
     } else {
         pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     }
@@ -604,6 +609,9 @@ if ($extTests -eq "1") {
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "Running tests with hyperv with admin privileges"
         Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
+    } elseif ($runAsAdmin -eq "1") {
+        Write-Host "Running tests with admin privileges"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"        
     } else {
         pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     }

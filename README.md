@@ -37,7 +37,8 @@ podman run --rm -d --name pde2e-runner-run \
             -start 1 \
             -envVars 'TEST_MACHINE=true,MY_ENV_VAR="some string",ENV_NUMBER=3' \
             -secretFile secrets.txt \
-            -scriptPaths 'podman_rootless.ps1,setup_compose.ps1'
+            -scriptPaths 'podman_rootless.ps1,setup_compose.ps1' \
+            -runAsAdmin 1
 
 # Running the image on Mac OS
 podman run --rm -d --name pde2e-runner-run \
