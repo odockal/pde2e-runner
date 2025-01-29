@@ -100,6 +100,17 @@ function Load-Variables() {
     Set-Item -Path "env:CI" -Value $true
     $global:scriptEnvVars += "CI"
     $global:envVarDefs += 'CI=true'
+
+    # Set PODMAN_DESKTOP_BINARY if exists
+    if($podmanDesktopBinary) {
+        Set-Item -Path "env:PODMAN_DESKTOP_BINARY" -Value "$podmanDesktopBinary"
+        $global:scriptEnvVars += "PODMAN_DESKTOP_BINARY"
+        $global:envVarDefs += "PODMAN_DESKTOP_BINARY=$podmanDesktopBinary"
+    } elseif ($extTests -eq "1") {
+        Set-Item -Path "env:PODMAN_DESKTOP_ARGS" -Value "$workingDir\podman-desktop"
+        $global:scriptEnvVars += "PODMAN_DESKTOP_ARGS"
+        $global:envVarDefs += "PODMAN_DESKTOP_ARGS=$workingDir\podman-desktop"
+    }
     # Check if the input string is not null or empty
     if (-not [string]::IsNullOrWhiteSpace($envVars)) {
         # Split the input using comma separator
@@ -400,12 +411,6 @@ if (-not(Test-Path -Path $toolsInstallDir)) {
     mkdir -p $toolsInstallDir
 }
 
-# load variables
-Load-Variables
-
-# load secrets
-Load-Secrets
-
 $podmanDesktopBinary=""
 
 if ([string]::IsNullOrWhiteSpace($pdPath))
@@ -419,6 +424,12 @@ if ([string]::IsNullOrWhiteSpace($pdPath))
     # set podman desktop binary path
     $podmanDesktopBinary=$pdPath
 }
+
+# load variables
+Load-Variables
+
+# load secrets
+Load-Secrets
 
 # Install or put the tool on the path, path is regenerated 
 if (-not (Command-Exists "node -v")) {
@@ -556,13 +567,6 @@ Clone-Checkout 'podman-desktop' $fork $branch
 
 if ($extTests -eq "1") {
     Clone-Checkout $extRepo $extFork $extBranch
-}
-
-# Set PODMAN_DESKTOP_BINARY if exists
-if($podmanDesktopBinary) {
-    $env:PODMAN_DESKTOP_BINARY="$podmanDesktopBinary";
-} elseif ($extTests -eq "1") {
-    $env:PODMAN_DESKTOP_ARGS="$workingDir\podman-desktop"
 }
 
 # Execute the arbitrary code from external source
