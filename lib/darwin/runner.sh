@@ -13,9 +13,9 @@ resultsFolder="results"
 fork="podman-desktop"
 branch="main"
 extTests=0
-extRepo="extension-bootc"
-extFork="podman-desktop"
-extBranch="main"
+extRepo=""
+extFork=""
+extBranch=""
 npmTarget="test:e2e"
 podmanPath=""
 initialize=0
@@ -59,6 +59,8 @@ download_pd() {
     echo "Downloading Podman Desktop from $pdUrl"
     curl -L "$pdUrl" -o pd.exe
 }
+
+echo "Reading envVars in script: '$envVars'"
 
 # Create a env. vars from a string: VAR=VAL,VAR2=VAL
 function load_variables() {

@@ -86,7 +86,7 @@ spec:
     default: '0'
   - name: env-vars
     description: Environment variables to be passed into image
-    default: "'TEST_PODMAN_MACHINE=true'"
+    default: "'TEST_PODMAN_MACHINE=true,TEST=2'"
   - name: secret-file
     description: A path to the files with secrets
     default: "''"
@@ -177,10 +177,16 @@ spec:
         cmd="$cmd --pdPath $(params.pd-path) "
         cmd="$cmd --pdUrl $(params.pd-url) "
         cmd="$cmd --extTests $(params.ext-tests) "
-        cmd="$cmd --extRepo $(params.ext-repo) "
-        cmd="$cmd --extFork $(params.ext-fork) "
-        cmd="$cmd --extBranch $(params.ext-branch) "
-        cmd="$cmd --envVars $(params.env-vars) "
+        if [[ -n "$(params.ext-repo)" ]]; then
+          cmd="$cmd --extRepo $(params.ext-repo) "
+        fi
+        if [[ -n "$(params.ext-fork)" ]]; then
+          cmd="$cmd --extRepo $(params.ext-fork) "
+        fi
+        if [[ -n "$(params.ext-branch)" ]]; then
+          cmd="$cmd --extRepo $(params.ext-branch) "
+        fi
+        cmd="$cmd --envVars '$(params.env-vars)' "
         cmd="$cmd --secretFile $(params.secret-file) "
         cmd="$cmd --fork $(params.fork) "
         cmd="$cmd --branch $(params.branch) "
@@ -196,6 +202,8 @@ spec:
         cmd="$cmd --cleanMachine $(params.clean-machine) "
       fi
       
+      echo "Composed Command to be executed: '${cmd}'"
+
       # Exec
       . entrypoint.sh "${cmd}"
 
