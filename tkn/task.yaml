@@ -86,7 +86,7 @@ spec:
     default: '0'
   - name: env-vars
     description: Environment variables to be passed into image
-    default: 'TEST_PODMAN_MACHINE=true'
+    default: "'TEST_PODMAN_MACHINE=true'"
   - name: secret-file
     description: A path to the files with secrets
     default: "''"
@@ -164,8 +164,8 @@ spec:
         cmd="$cmd -initialize $(params.podman-initialize) "
         cmd="$cmd -start $(params.podman-start) "
         cmd="$cmd -rootful $(params.podman-rootful) "
-        cmd="$cmd -userNetworking $(params.podman-user-networking)"
-        cmd="$cmd -scriptPaths $(params.script-paths)"
+        cmd="$cmd -userNetworking $(params.podman-user-networking) "
+        cmd="$cmd -scriptPaths $(params.script-paths) "
         if [[ -n "$(params.podman-provider)" ]]; then
           cmd="$cmd -podmanProvider $(params.podman-provider) "
         fi

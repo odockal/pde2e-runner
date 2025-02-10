@@ -50,9 +50,9 @@ $gitVersion = '2.42.0.2'
 $global:scriptEnvVars = @()
 $global:envVarDefs = @()
 
-function Download-PD {
-    Write-Host "Downloading Podman Desktop from $pdUrl"
-    curl.exe -L $pdUrl -o pd.exe
+function Download-PD($fileName) {
+    Write-Host "Downloading Podman Desktop from $pdUrl and saving to $fileName"
+    curl.exe -L $pdUrl -o $fileName
 }
 
 # Function to check if a command is available
@@ -411,14 +411,35 @@ if (-not(Test-Path -Path $toolsInstallDir)) {
     mkdir -p $toolsInstallDir
 }
 
+# Installation of podman desktop
 $podmanDesktopBinary=""
 
 if ([string]::IsNullOrWhiteSpace($pdPath))
 {
     if (-not [string]::IsNullOrWhiteSpace($pdUrl)) {
         # set binary path
-        Download-PD
-        $podmanDesktopBinary="$workingDir\pd.exe"
+        if ($pdUrl.Contains('setup')) {
+            Download-PD('pd-setup.exe')
+            write-host "Installing Podman Desktop from setup.exe file..."
+            # run the installer
+            Start-Process -Wait -FilePath "$workingDir\pd-setup.exe" -ArgumentList "/S" -PassThru
+            # podman desktop should be under $env:LOCALAPPDATA\Programs\podman-desktop
+            $pdLocalAppData="$env:LOCALAPPDATA\Programs\podman-desktop"
+            $pdPath="$pdLocalAppData\Podman Desktop.exe"
+            write-host "Podman Desktop is installed on expected path: $pdLocalAppData"
+            if (Test-Path -Path $pdPath -PathType Leaf) {
+                write-host "Podman Desktop installation present..."
+                mv "$pdPath" "$pdLocalAppData\pd.exe"
+                write-host
+                $podmanDesktopBinary="$pdLocalAppData\pd.exe"
+            } else {
+                write-host "Podman Desktop installation missing..."
+            }
+        } else {
+            Download-PD('pd.exe')
+            write-host "Only a binary is available from url..."
+            $podmanDesktopBinary="$workingDir\pd.exe"
+        }
     }
 } else {
     # set podman desktop binary path
