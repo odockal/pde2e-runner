@@ -11,16 +11,25 @@ $largeImage="registry.access.redhat.com/ubi8/httpd-24-3:latest" # ~460MB
 $testImage=$tinyImage
 
 # pull the image
+Write-Host "Pulling image: $testImage"
 podman pull $testImage
 
 # repeat 10 times
 for ($imgNum = 1; $imgNum -lt 11; $imgNum++) {
     # tag (in pd, effectively, copy)
-    podman tag $testImage "quay.io/my-image-$imgNum:latest"
+    $taggedImage="localhost/my-image-$($imgNum):latest"
+    Write-Host "Tagging image: $testImage as $taggedImage"
+    podman tag $testImage $taggedImage
+    
     # create container
-    podman run -d --name "my-container-$imgNum" "quay.io/my-image-$imgNum:latest"
+    $containerName="my-container-$imgNum"
+    Write-Host "Creating container: $containerName"
+    podman run -d --name $containerName $taggedImage
+
     #create pod
-    podman pod create --name "my-pod-$imgNum"
+    $podName="my-pod-$imgNum"
+    Write-Host "Creating pod: $podName"
+    podman pod create --name $podName
 }
 
 # run the stress tests...
