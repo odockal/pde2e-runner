@@ -396,4 +396,10 @@ if (( cleanMachine == 1 )); then
     podman machine reset -f
 fi
 
+composeBinary=$(which docker-compose)
+if [ -f "$composeBinary" ]; then
+    echo "Removing compose binary file"
+    rm "$composeBinary"
+fi 
+
 echo "Script finished..."
