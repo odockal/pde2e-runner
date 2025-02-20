@@ -14,8 +14,9 @@ $testImage=$tinyImage
 Write-Host "Pulling image: $testImage"
 podman pull $testImage
 
-# repeat 10 times
-for ($imgNum = 1; $imgNum -lt 11; $imgNum++) {
+# repeat 100 times
+Write-Host "Number of objects to generate => $($env:$OBJECT_NUM)"
+for ($imgNum = 1; $imgNum -le $($env:$OBJECT_NUM); $imgNum++) {
     # tag (in pd, effectively, copy)
     $taggedImage="localhost/my-image-$($imgNum):latest"
     Write-Host "Tagging image: $testImage as $taggedImage"
