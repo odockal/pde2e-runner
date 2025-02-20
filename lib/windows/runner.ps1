@@ -452,6 +452,19 @@ Load-Variables
 # load secrets
 Load-Secrets
 
+# Install VC Redistributable
+write-host "Install VC_Redistributable"
+if (-not (Test-Path -Path "$toolsInstallDir\vc_redist.x64.exe" -PathType Container)) {
+    Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "$toolsInstallDir\vc_redist.x64.exe"
+    $vcredistInstaller = "$toolsInstallDir\vc_redist.x64.exe"
+
+    if (Test-Path $vcredistInstaller) {
+        Start-Process -FilePath $vcredistInstaller -ArgumentList "/install", "/passive", "/norestart" -Wait
+    } else {
+        Write-Host "Installer not found at $vcredistInstaller"
+    }
+}
+
 # Install or put the tool on the path, path is regenerated 
 if (-not (Command-Exists "node -v")) {
     # Download and install the latest version of Node.js
