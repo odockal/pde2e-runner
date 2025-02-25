@@ -399,7 +399,7 @@ fi
 composeBinary=$(which docker-compose)
 if [ -f "$composeBinary" ]; then
     echo "Removing compose binary file"
-    rm "$composeBinary"
+    sudo rm "$composeBinary"
 fi 
 
 echo "Script finished..."
