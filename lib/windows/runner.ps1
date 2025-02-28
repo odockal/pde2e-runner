@@ -101,6 +101,15 @@ function Load-Variables() {
     $global:scriptEnvVars += "CI"
     $global:envVarDefs += 'CI=true'
 
+    write-host "Setting default env. var.: ROOTFUL_MODE=0"
+    $rootfulMode='false'
+    if $rootful -eq '1' {
+        $rootfulMode='true'
+    }
+    Set-Item -Path "env:ROOTFUL_MODE" -Value $rootfulMode
+    $global:scriptEnvVars += "ROOTFUL_MODE"
+    $global:envVarDefs += "ROOTFUL_MODE=$rootfulMode"
+
     # Set PODMAN_DESKTOP_BINARY if exists
     if($podmanDesktopBinary) {
         Set-Item -Path "env:PODMAN_DESKTOP_BINARY" -Value "$podmanDesktopBinary"
