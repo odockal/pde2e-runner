@@ -237,27 +237,31 @@ fi
 
 # node installation
 if ! command -v node &> /dev/null; then
-    if [ "$architecture" = "x86_64" ]; then
-        nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-darwin-x64.tar.xz"
-    elif [ "$architecture" = "arm64" ]; then
-        nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-darwin-arm64.tar.xz"
+    # architecture in [arm64, x86_64]
+    # node arch strings in [arm64, x64]
+    nodeArch=""
+    if [ "$architecture" == "x86_64" ]; then
+        nodeArch="x64"
+    elif [ "$architecture" == "arm64" ]; then
+        nodeArch="arm64"
     else
         echo "Error: Unsupported architecture $architecture"
         exit 1
     fi
+    nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-darwin-$nodeArch.tar.xz"
 
     # Check if Node.js is already installed
     echo "$(ls $toolsInstallDir)"
-    if [ ! -d "$toolsInstallDir/node-$nodeVersion-darwin-x64" ]; then
+    if [ ! -d "$toolsInstallDir/node-$nodeVersion-darwin-$nodeArch" ]; then
         # Download and install Node.js
         echo "Installing node $nodeVersion for $architecture architecture"
         echo "curl -O $nodeUrl | tar -xJ -C $toolsInstallDir"
         curl -o "$toolsInstallDir/node.tar.xz" "$nodeUrl" 
         tar -xf $toolsInstallDir/node.tar.xz -C $toolsInstallDir
     fi
-    if [ -d "$toolsInstallDir/node-$nodeVersion-darwin-${architecture}/bin" ]; then
+    if [ -d "$toolsInstallDir/node-$nodeVersion-darwin-${nodeArch}/bin" ]; then
         echo "Node Installation path found"
-        export PATH="$PATH:$toolsInstallDir/node-$nodeVersion-darwin-${architecture}/bin"
+        export PATH="$PATH:$toolsInstallDir/node-$nodeVersion-darwin-${nodeArch}/bin"
     else
         echo "Node installation path not found"
     fi
@@ -287,7 +291,7 @@ git --version
 
 # Install pnpm
 echo "Installing pnpm"
-sudo npm install -g pnpm
+sudo npm install -g pnpm@9
 echo "pnpm Version: $(pnpm --version)"
 
 # Podman desktop binary
