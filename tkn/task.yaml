@@ -190,10 +190,10 @@ spec:
           cmd="$cmd --extRepo $(params.ext-repo) "
         fi
         if [[ -n "$(params.ext-fork)" ]]; then
-          cmd="$cmd --extRepo $(params.ext-fork) "
+          cmd="$cmd --extFork $(params.ext-fork) "
         fi
         if [[ -n "$(params.ext-branch)" ]]; then
-          cmd="$cmd --extRepo $(params.ext-branch) "
+          cmd="$cmd --extBranch $(params.ext-branch) "
         fi
         cmd="$cmd --envVars '$(params.env-vars)' "
         cmd="$cmd --secretFile $(params.secret-file) "
