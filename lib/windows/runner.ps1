@@ -103,7 +103,7 @@ function Load-Variables() {
 
     write-host "Setting default env. var.: ROOTFUL_MODE=0"
     $rootfulMode='false'
-    if $rootful -eq '1' {
+    if ($rootful -eq '1') {
         $rootfulMode='true'
     }
     Set-Item -Path "env:ROOTFUL_MODE" -Value $rootfulMode
