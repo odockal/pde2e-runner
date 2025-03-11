@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Versions variables
-nodeVersion="v20.11.1"
+nodeVersion="v22.14.0"
 gitVersion="2.42.0"
 
 declare -a script_env_vars
