@@ -11,6 +11,8 @@ param(
     [string]$fork = "podman-desktop",
     [Parameter(HelpMessage = 'Podman Desktop Branch')]
     [string]$branch = "main",
+    [Parameter(HelpMessage = 'Podman Desktop Repository name')]
+    [string]$repo = "podman-desktop",
     [Parameter(HelpMessage = 'Extension repo')]
     [string]$extRepo = "podman-desktop-redhat-account-ext",
     [Parameter(HelpMessage = 'Extension Fork')]
@@ -606,7 +608,7 @@ if ($initialize -eq "1") {
 
 
 # checkout podman-desktop
-Clone-Checkout 'podman-desktop' $fork $branch
+Clone-Checkout $repo $fork $branch
 
 if ($extTests -eq "1") {
     Clone-Checkout $extRepo $extFork $extBranch
