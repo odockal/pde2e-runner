@@ -400,28 +400,15 @@ if (( cleanMachine == 1 )); then
     podman machine reset -f
 fi
 
-composeBinary=$(which docker-compose)
-if [ -f "$composeBinary" ]; then
-    echo "Removing compose binary file"
-    sudo rm "$composeBinary"
-fi 
-
-kubectlBinary=$(which kubectl)
-if [ -f "$kubectlBinary" ]; then
-    echo "Removing kubectl binary file"
-    sudo rm "$kubectlBinary"
-fi 
-
-kindBinary=$(which kind)
-if [ -f "$kindBinary" ]; then
-    echo "Removing kind binary file"
-    sudo rm "$kindBinary"
-fi 
-
-minikubeBinary=$(which minikube)
-if [ -f "$minikubeBinary" ]; then
-    echo "Removing minikube binary file"
-    sudo rm "$minikubeBinary"
-fi 
+# Remove binaries
+binaries=("docker-compose" "kubectl" "kind" "minikube" "crc")
+for binary in "${binaries[@]}"; 
+do
+    binaryPath=$(which "$binary")
+    if [ -f "$binaryPath" ]; then
+        echo "Removing $binary binary file"
+        sudo rm "$binaryPath"
+    fi
+done
 
 echo "Script finished..."
