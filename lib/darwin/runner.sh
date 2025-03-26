@@ -400,10 +400,15 @@ if (( cleanMachine == 1 )); then
     podman machine reset -f
 fi
 
-composeBinary=$(which docker-compose)
-if [ -f "$composeBinary" ]; then
-    echo "Removing compose binary file"
-    sudo rm "$composeBinary"
-fi 
+# Remove binaries
+binaries=("docker-compose" "kubectl" "kind" "minikube" "crc")
+for binary in "${binaries[@]}"; 
+do
+    binaryPath=$(which "$binary")
+    if [ -f "$binaryPath" ]; then
+        echo "Removing $binary binary file"
+        sudo rm "$binaryPath"
+    fi
+done
 
 echo "Script finished..."
