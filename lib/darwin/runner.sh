@@ -26,6 +26,7 @@ secretFile=""
 podmanProvider=""
 saveTraces=1
 cleanMachine=1
+script_paths=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -49,6 +50,7 @@ while [[ $# -gt 0 ]]; do
         --podmanProvider) podmanProvider="$2"; shift ;;
         --saveTraces) saveTraces="$2"; shift ;;
         --cleanMachine) cleanMachine="$2"; shift ;;
+        --scriptPaths) script_paths="$2"; shift ;;
         *) ;;
     esac
     shift
@@ -94,6 +96,32 @@ function load_variables() {
         echo "Settings CONTAINERS_MACHINE_PROVIDER: $podmanProvider"
         export CONTAINERS_MACHINE_PROVIDER=$podmanProvider
         script_env_vars+=("CONTAINERS_MACHINE_PROVIDER")
+    fi
+}
+
+function execute_scripts() {
+    echo "Loading Paths passed into image"
+    echo "ScriptPaths String: '$script_paths'"
+    
+    # Check if the input string is not null or empty
+    if [[ -n "$script_paths" ]]; then
+        scripts_folder="$resourcesPath"
+        
+        # Split the input using comma separator
+        IFS=',' read -r -a paths <<< "$script_paths"
+        
+        for path in "${paths[@]}"; do
+            path=$(echo "$path" | xargs) # Trim whitespace
+            echo "Processing $path"
+            script_path="$scripts_folder/$path"
+            
+            if [[ -f "$script_path" ]]; then
+                echo "Executing $script_path"
+                bash "$script_path"
+            else
+                echo "$script_path does not exist"
+            fi
+        done
     fi
 }
 
@@ -226,6 +254,9 @@ resourcesPath=$workingDir
 
 # Loading env. vars
 load_variables
+
+# Execute the scripts
+execute_scripts
 
 # load secrets
 load_secrets
