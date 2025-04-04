@@ -26,7 +26,7 @@ secretFile=""
 podmanProvider=""
 saveTraces=1
 cleanMachine=1
-script_paths=""
+scriptPaths=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         --podmanProvider) podmanProvider="$2"; shift ;;
         --saveTraces) saveTraces="$2"; shift ;;
         --cleanMachine) cleanMachine="$2"; shift ;;
-        --scriptPaths) script_paths="$2"; shift ;;
+        --scriptPaths) scriptPaths="$2"; shift ;;
         *) ;;
     esac
     shift
@@ -101,14 +101,14 @@ function load_variables() {
 
 function execute_scripts() {
     echo "Loading Paths passed into image"
-    echo "ScriptPaths String: '$script_paths'"
+    echo "ScriptPaths String: '$scriptPaths'"
     
     # Check if the input string is not null or empty
-    if [[ -n "$script_paths" ]]; then
+    if [[ -n "$scriptPaths" ]]; then
         scripts_folder="$resourcesPath"
         
         # Split the input using comma separator
-        IFS=',' read -r -a paths <<< "$script_paths"
+        IFS=',' read -r -a paths <<< "$scriptPaths"
         
         for path in "${paths[@]}"; do
             path=$(echo "$path" | xargs) # Trim whitespace

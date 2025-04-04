@@ -209,6 +209,9 @@ spec:
         fi
         cmd="$cmd --saveTraces $(params.save-traces) "
         cmd="$cmd --cleanMachine $(params.clean-machine) "
+        if [[ -n "$(params.script-paths)" ]]; then
+          cmd="$cmd --scriptPaths $(params.script-paths) "
+        fi
       fi
       
       echo "Composed Command to be executed: '${cmd}'"
