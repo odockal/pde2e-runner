@@ -168,7 +168,11 @@ function Execute-Scripts() {
             $scriptPath="$scriptsFolder\$path"
             if (Test-Path $scriptPath) {
                 write-host "Executing $scriptPath"
-                & "$scriptPath"
+                if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
+                    Invoke-Admin-Command -Command "& $scriptPath" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp
+                } else {
+                    & "$scriptPath"
+                }
             } else {
                 write-host "$scriptPath does not exist"
             }
@@ -614,12 +618,13 @@ if ($extTests -eq "1") {
     Clone-Checkout $extRepo $extFork $extBranch
 }
 
-# Execute the arbitrary code from external source
-Execute-Scripts
-
 # pnpm INSTALL AND TEST PART PODMAN-DESKTOP
 $thisDir="$workingDir\podman-desktop"
 cd $thisDir
+
+# Execute the arbitrary code from external source
+Execute-Scripts
+
 write-host "Installing dependencies of podman-desktop"
 pnpm install --frozen-lockfile 2>&1 | Tee-Object -FilePath 'output.log' -Append
 

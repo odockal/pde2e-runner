@@ -48,7 +48,7 @@ rm -r $env:APPDATA\containers\*
 rm -r $env:USERPROFILE\.config\containers
 
 # create a connection from previous information
-podman system connection add $remoteMachine --identity $identity $uri
+podman system connection add $remoteMachine --identity "$identity" "$uri"
 
 # check connection
 podman system connection ls --format json
