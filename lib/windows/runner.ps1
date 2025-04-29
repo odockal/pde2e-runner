@@ -687,11 +687,11 @@ if ($secretFile) {
 $exeNames = @("docker-compose", "kubectl", "kind", "minikube", "crc") 
 Write-host "Clean up executables: $exeNames"
 foreach ($executable in $exeNames) {
-    try {
+    if(Command-Exists $executable) {
         Write-host "Removing $executable from path"
         $exePath = (Get-Command $executable).Source
         Remove-Item -Path $exePath
-    } catch {
+    } else {
         Write-host "$executable not found, nothing to remove."
     }
 }
