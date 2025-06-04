@@ -3,6 +3,7 @@
 # Versions variables
 nodeVersion="v22.14.0"
 gitVersion="2.42.0"
+pnpmVersion="10"
 
 declare -a script_env_vars
 
@@ -322,7 +323,7 @@ git --version
 
 # Install pnpm
 echo "Installing pnpm"
-sudo npm install -g pnpm@9
+sudo npm install -g pnpm@$pnpmVersion
 echo "pnpm Version: $(pnpm --version)"
 
 # Podman desktop binary
