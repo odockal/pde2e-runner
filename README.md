@@ -50,17 +50,25 @@ podman run --rm -d --name pde2e-runner-run \
           -e OUTPUT_FOLDER=/data \
           -e DEBUG=true \
           -v $PWD:/data:z \
-          quay.io/odockal/pde2e-runner:v0.0.1-darwin  \
+          -v $PWD/secrets.txt:/opt/pde2e-runner/secrets.txt:z \
+          quay.io/odockal/pde2e-runner:v0.0.4-snapshot-darwin  \
             pd-e2e/runner.sh \
-            --targetFolder pd-e2e-runner \
+            --targetFolder pd-e2e \
             --resultsFolder results \
-            --fork containers \
+            --fork podman-desktop \
             --branch main \
+            --secretFile secrets.txt \
             --npmTarget "test:e2e" \
-            --podmanPath "$(cat results/podman-location.log)" \
-            --initialize 1 \
+            --initialize 0 \
             --rootful 1 \
-            --start 1
+            --start 0 \
+            --extTests 1 \
+            --extRepo podman-desktop-sandbox-ext \
+            --extFork redhat-developer \
+            --extBranch main \
+            --pdUrl "https://github.com/podman-desktop/testing-prereleases/releases/download/v1.20.0-202506060133-deec1eda430/podman-desktop-1.20.0-202506060133-deec1eda430-arm64.dmg"
+
+podman logs -f pde2e-runner-run
 ```
 
 ## Get the image logs

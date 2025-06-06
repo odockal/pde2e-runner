@@ -59,8 +59,8 @@ done
 
 # Functions
 download_pd() {
-    echo "Downloading Podman Desktop from $pdUrl"
-    curl -L "$pdUrl" -o pd.exe
+    echo "Downloading Podman Desktop dmg from $pdUrl"
+    curl -L -O "$pdUrl"
 }
 
 echo "Reading envVars in script: '$envVars'"
@@ -256,9 +256,6 @@ resourcesPath=$workingDir
 # Loading env. vars
 load_variables
 
-# Execute the scripts
-execute_scripts
-
 # load secrets
 load_secrets
 
@@ -326,23 +323,13 @@ echo "Installing pnpm"
 sudo npm install -g pnpm@$pnpmVersion
 echo "pnpm Version: $(pnpm --version)"
 
-# Podman desktop binary
-podmanDesktopBinary=""
-
-if [ -z "$pdPath" ]; then
-    if [ -n "$pdUrl" ]; then
-        Download_PD
-        podmanDesktopBinary="$workingDir/pd.exe"
-    fi
-else
-    podmanDesktopBinary="$pdPath"
-fi
-
 # Setup Podman
-if [ -n "$podmanPath" ] && ! command -v podman &> /dev/null; then
-    echo "Podman is not installed..."
-    echo "Settings podman binary location to PATH"
-    export PATH="$PATH:$podmanPath"
+if ! command -v podman &> /dev/null; then
+    if [ -n "$podmanPath" ]; then
+        echo "Podman is not installed..."
+        echo "Settings podman binary location to PATH"
+        export PATH="$PATH:$podmanPath"
+    fi
 else
     echo "Warning: Podman nor Podman Path is specified!"
     # exit 1;
@@ -372,33 +359,67 @@ if (( initialize == 1 )); then
     podman machine ls --format json 2>&1 | tee -a "$logFile"
 fi
 
-# Checkout Podman Desktop
-clone_checkout "podman-desktop" $fork $branch
+# Podman desktop binary
+podmanDesktopBinary=""
+appPath=""
 
-if (( extTests == 1 )); then
-    # Checkout Podman Desktop if it does not exist
-    clone_checkout $extRepo $extFork $extBranch
+if [ -z "$pdPath" ]; then
+    if [ -n "$pdUrl" ]; then    
+        download_pd
+        dmgPath=$(realpath $(find . -name *podman-desktop*))
+        version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        hdiutil attach $dmgPath
+        pdVolumePath=$(find /Volumes -name "*Podman Desktop $version*" -maxdepth 1)
+        echo "PD Volume path: $pdVolumePath"
+        sudo cp -R "$pdVolumePath/Podman Desktop.app" /Applications
+        hdiutil detach "$pdVolumePath"
+        # codesign the extracted app
+        appPath="/Applications/Podman Desktop.app"
+        sudo codesign --force --deep --sign - "$appPath"
+        codesign --verify --deep --verbose=2 "$appPath"
+        podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
+    fi
+else
+    podmanDesktopBinary="$pdPath"
 fi
 
 if [ -n "$podmanDesktopBinary" ]; then
+    echo "Setting PODMAN_DESKTOP_BINARY to: $podmanDesktopBinary"
     export PODMAN_DESKTOP_BINARY="$podmanDesktopBinary"
 elif (( extTests == 1 )); then
+    echo "Setting PODMAN_DESKTOP_ARGS to: $workingDir/podman-desktop"
     export PODMAN_DESKTOP_ARGS="$workingDir/podman-desktop"
 fi
 
 export CI=true
 testsOutputLog="$workingDir/$resultsFolder/tests.log"
-cd "$workingDir/podman-desktop"
-echo "Installing dependencies storing pnpm run output in: $testsOutputLog"
-pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
-if (( extTests == 0 )); then
-    echo "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
-    pnpm "$npmTarget" 2>&1 | tee -a $testsOutputLog
-    collect_logs "podman-desktop"
+# Checkout Podman Desktop only if necessary
+if [[ "$extTests" -eq 1 ]] && [ -n "$podmanDesktopBinary" ] ; then
+    echo "Running ext. tests and podman Desktop binary is specified, skipping checkout for podman-desktop"
 else
-    echo "Building podman-desktop for extension e2e tests"
-    pnpm test:e2e:build 2>&1 | tee -a $testsOutputLog
+    echo "Checking out Podman Desktop repository"
+    clone_checkout "podman-desktop" $fork $branch
+    cd "$workingDir/podman-desktop"
+    echo "Installing dependencies and storing pnpm run output in: $testsOutputLog"
+    pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
+    if [[ "$extTests" -eq 0 ]]; then
+        echo "Running the e2e playwright tests using target: $npmTarget, binary path, if any: $podmanDesktopBinary"
+        pnpm "$npmTarget" 2>&1 | tee -a $testsOutputLog
+        collect_logs "podman-desktop"
+    else
+        echo "Building podman-desktop for extension e2e tests"
+        pnpm test:e2e:build 2>&1 | tee -a $testsOutputLog
+    fi
 fi
+
+# Checkout extension's repository
+if [[ "$extTests" -eq 1 ]]; then
+    echo "Checking out extension repository: $extRepo"
+    clone_checkout $extRepo $extFork $extBranch
+fi
+
+# Execute the scripts
+execute_scripts
 
 ## run extension e2e tests
 if (( extTests == 1 )); then
@@ -429,12 +450,19 @@ fi
 
 if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines"
+    which podman || true
     podman machine reset -f
+fi
+
+if [ -n "$podmanDesktopBinary" ]; then
+    # removing installed app
+    echo "Removing Podman Desktop app from /Applications"
+    sudo rm -rf "$appPath"
 fi
 
 # Remove binaries
 binaries=("docker-compose" "kubectl" "kind" "minikube" "crc")
-for binary in "${binaries[@]}"; 
+for binary in "${binaries[@]}";
 do
     binaryPath=$(which "$binary")
     if [ -f "$binaryPath" ]; then
