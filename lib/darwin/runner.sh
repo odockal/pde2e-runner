@@ -59,8 +59,8 @@ done
 
 # Functions
 download_pd() {
-    echo "Downloading Podman Desktop from $pdUrl"
-    curl -L "$pdUrl" -o pd.exe
+    echo "Downloading Podman Desktop dmg from $pdUrl"
+    curl -L -O "$pdUrl"
 }
 
 echo "Reading envVars in script: '$envVars'"
@@ -256,9 +256,6 @@ resourcesPath=$workingDir
 # Loading env. vars
 load_variables
 
-# Execute the scripts
-execute_scripts
-
 # load secrets
 load_secrets
 
@@ -326,18 +323,6 @@ echo "Installing pnpm"
 sudo npm install -g pnpm@$pnpmVersion
 echo "pnpm Version: $(pnpm --version)"
 
-# Podman desktop binary
-podmanDesktopBinary=""
-
-if [ -z "$pdPath" ]; then
-    if [ -n "$pdUrl" ]; then
-        Download_PD
-        podmanDesktopBinary="$workingDir/pd.exe"
-    fi
-else
-    podmanDesktopBinary="$pdPath"
-fi
-
 # Setup Podman
 if [ -n "$podmanPath" ] && ! command -v podman &> /dev/null; then
     echo "Podman is not installed..."
@@ -380,11 +365,37 @@ if (( extTests == 1 )); then
     clone_checkout $extRepo $extFork $extBranch
 fi
 
+# Podman desktop binary
+podmanDesktopBinary=""
+
+if [ -z "$pdPath" ]; then
+    if [ -n "$pdUrl" ]; then
+        download_pd
+        dmgPath=$(realpath $(find . -name *podman-desktop*))
+        version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        hdiutil attach $dmgPath
+        pdVolumePath=$(find /Volumes -name "*Podman Desktop $version*" -maxdepth 1)
+        echo "PD Volume path: $pdVolumePath"
+        sudo cp -R "$pdVolumePath/Podman Desktop.app" /Applications
+        hdiutil detach "$pdVolumePath"
+        # codesign the extracted app
+        appPath="/Applications/Podman Desktop.app"
+        sudo codesign --force --deep --sign - "$appPath"
+        codesign --verify --deep --verbose=2 "$appPath"
+        podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
+    fi
+else
+    podmanDesktopBinary="$pdPath"
+fi
+
 if [ -n "$podmanDesktopBinary" ]; then
     export PODMAN_DESKTOP_BINARY="$podmanDesktopBinary"
 elif (( extTests == 1 )); then
     export PODMAN_DESKTOP_ARGS="$workingDir/podman-desktop"
 fi
+
+# Execute the scripts
+execute_scripts
 
 export CI=true
 testsOutputLog="$workingDir/$resultsFolder/tests.log"
