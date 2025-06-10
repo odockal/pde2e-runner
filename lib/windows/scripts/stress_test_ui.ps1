@@ -21,6 +21,10 @@ switch ($env:IMAGE_SIZE) {
     "large" {
         $testImage=$largeImage
     }
+    default {
+        Write-Host "IMAGE_SIZE '$env:IMAGE_SIZE' not found. Setting testImage to tinyImage"
+        $testImage=$tinyImage
+    }
 }
 
 # pull the image
