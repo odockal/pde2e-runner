@@ -8,7 +8,20 @@ $smallImage="quay.io/sclorg/nginx-122-micro-c9s:20230718" # ~70MB
 $mediumImage="docker.io/library/nginx:latest" # ~200MB
 $largeImage="registry.access.redhat.com/ubi8/httpd-24-3:latest" # ~460MB
 
-$testImage=$tinyImage
+switch ($env:IMAGE_SIZE) {
+    "tiny" {
+        $testImage=$tinyImage
+    }
+    "small" {
+        $testImage=$smallImage
+    }
+    "medium" {
+        $testImage=$mediumImage
+    }
+    "large" {
+        $testImage=$largeImage
+    }
+}
 
 # pull the image
 Write-Host "Pulling image: $testImage"
