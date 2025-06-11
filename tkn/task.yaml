@@ -71,7 +71,7 @@ spec:
     default: 'test:e2e'
   - name: podman-path
     description: Path to a podman binary
-    default: ''
+    default: "''"
   - name: podman-initialize
     description: Podman initialization
     default: '1'
@@ -200,7 +200,9 @@ spec:
         cmd="$cmd --fork $(params.fork) "
         cmd="$cmd --branch $(params.branch) "
         cmd="$cmd --npmTarget $(params.npm-target) "
-        cmd="$cmd --podmanPath $(params.podman-path) "
+        if [[ -n "$(params.podman-path)" ]]; then
+          cmd="$cmd --podmanPath $(params.podman-path) "
+        fi
         cmd="$cmd --initialize $(params.podman-initialize) "
         cmd="$cmd --start $(params.podman-start) "
         cmd="$cmd --rootful $(params.podman-rootful) "
