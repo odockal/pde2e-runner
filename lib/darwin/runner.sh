@@ -327,8 +327,14 @@ echo "pnpm Version: $(pnpm --version)"
 if ! command -v podman &> /dev/null; then
     if [ -n "$podmanPath" ]; then
         echo "Podman is not installed..."
-        echo "Settings podman binary location to PATH"
+        echo "Settings podman binary location '$podmanPath' to PATH"
         export PATH="$PATH:$podmanPath"
+    elif [ -d '/opt/podman/bin' ]; then   
+        echo "Podman is installed in /opt/podman/bin..."
+        export PATH="$PATH:/opt/podman/bin"
+    else
+        echo "Podman is not installed, please install it first"
+        exit 1
     fi
 else
     echo "Warning: Podman nor Podman Path is specified!"

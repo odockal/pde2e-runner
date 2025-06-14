@@ -184,7 +184,9 @@ spec:
         cmd="$cmd --targetFolder ${TARGET_FOLDER} "
         cmd="$cmd --resultsFolder ${TARGET_RESULTS} "
         cmd="$cmd --pdPath $(params.pd-path) "
-        cmd="$cmd --pdUrl $(params.pd-url) "
+        if [[ -n "$(params.pd-url)" ]]; then
+          cmd="$cmd --pdUrl $(params.pd-url) "
+        fi
         cmd="$cmd --extTests $(params.ext-tests) "
         if [[ -n "$(params.ext-repo)" ]]; then
           cmd="$cmd --extRepo $(params.ext-repo) "
