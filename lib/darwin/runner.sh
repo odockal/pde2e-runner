@@ -341,6 +341,23 @@ else
     # exit 1;
 fi
 
+if (( cleanMachine == 1 )); then
+    echo "Cleaning up the podman machines before running the tests"
+    # Reset Podman Machine
+    podman machine reset -f
+fi
+
+# get running Podman Desktop instances and terminate them
+exit_status=0
+echo "pid of running Podman Desktop instances:"
+pgrep -f "Podman Desktop" || exit_status=$?
+if (( exit_status == 0 )); then
+    echo "Podman Desktop is running, terminating..."
+    kill -9 $(pgrep -f "Podman Desktop")
+else
+    echo "No running Podman Desktop"
+fi
+
 # Configure Podman Machine
 if (( initialize == 1 )); then
     flags=""
@@ -456,7 +473,6 @@ fi
 
 if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines"
-    which podman || true
     podman machine reset -f
 fi
 
