@@ -440,7 +440,21 @@ if ([string]::IsNullOrWhiteSpace($pdPath))
             # run the installer
             Start-Process -Wait -FilePath "$workingDir\pd-setup.exe" -ArgumentList "/S" -PassThru
             # podman desktop should be under $env:LOCALAPPDATA\Programs\podman-desktop
-            $pdLocalAppData="$env:LOCALAPPDATA\Programs\podman-desktop"
+            # newly, it can be on $env:LOCALAPPDATA\Programs\Podman Desktop\
+            $localAppDataPrograms="$env:LOCALAPPDATA\Programs"
+            Get-ChildItem -Path $localAppDataPrograms
+            $pdLocalAppData="$localAppDataPrograms\podman-desktop"
+            if (Test-Path -Path "$pdLocalAppData") {
+                write-host "Podman Desktop installation path: $pdLocalAppData"
+            } else {
+                $pdLocalAppData="$localAppDataPrograms\Podman Desktop"
+                if (Test-Path -Path "$pdLocalAppData") {
+                    write-host "Podman Desktop new installation path path: $pdLocalAppData"
+                } else {
+                    write-host "Podman Desktop installation path is missing..."
+                    exit 1
+                }
+            }
             $pdPath="$pdLocalAppData\Podman Desktop.exe"
             write-host "Podman Desktop is installed on expected path: $pdLocalAppData"
             if (Test-Path -Path $pdPath -PathType Leaf) {
@@ -449,7 +463,9 @@ if ([string]::IsNullOrWhiteSpace($pdPath))
                 write-host
                 $podmanDesktopBinary="$pdLocalAppData\pd.exe"
             } else {
-                write-host "Podman Desktop installation missing..."
+                write-host "Podman Desktop binary is missing..."
+                ls $pdLocalAppData
+                exit 1
             }
         } else {
             Download-PD('pd.exe')
