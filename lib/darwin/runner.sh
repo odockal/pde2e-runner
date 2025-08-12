@@ -345,6 +345,9 @@ if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines before running the tests"
     # Reset Podman Machine
     podman machine reset -f
+    # remove old podman system connections from user space
+    rm -rf ~/.config/containers/podman-connections.json*
+    rm -rf ~/.config/containers/podman
 fi
 
 # get running Podman Desktop instances and terminate them
