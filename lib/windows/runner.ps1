@@ -650,10 +650,10 @@ if ($extTests -ne "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget, binary used: $podmanDesktopBinary"
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "Running tests with hyperv with admin privileges"
-        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 7200 -SetSecrets "1"
     } elseif ($runAsAdmin -eq "1") {
         Write-Host "Running tests with admin privileges"
-        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 7200 -SetSecrets "1"
     } else {
         pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     }
@@ -679,10 +679,10 @@ if ($extTests -eq "1") {
     write-host "Running the e2e playwright tests using target: $npmTarget"
     if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {
         Write-Host "Running tests with hyperv with admin privileges"
-        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -EnvVarName "CONTAINERS_MACHINE_PROVIDER" -EnvVarValue "hyperv" -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 7200 -SetSecrets "1"
     } elseif ($runAsAdmin -eq "1") {
         Write-Host "Running tests with admin privileges"
-        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 3600 -SetSecrets "1"        
+        Invoke-Admin-Command -Command "pnpm $npmTarget" -WorkingDirectory $thisDir -Privileged "1" -TargetFolder $targetLocationTmpScp -WaitForCommand $false -WaitTimeout 7200 -SetSecrets "1"
     } else {
         pnpm $npmTarget 2>&1 | Tee-Object -FilePath 'output.log' -Append
     }
