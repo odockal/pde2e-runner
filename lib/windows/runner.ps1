@@ -41,6 +41,8 @@ param(
     [string]$secretFile='',
     [Parameter(HelpMessage = 'Scripts file names available on the image to execute, under scripts folder, divided with comma')]
     $scriptPaths='',
+    [Parameter(HelpMessage = 'Save traces in test artifacts, default is 1/true')]
+    $saveTraces='1',
     [Parameter(HelpMessage = 'Run tests as admin')]
     $runAsAdmin = '0'
 )
@@ -150,6 +152,13 @@ function Load-Variables() {
         Write-Host "Input string is empty."
     }
 
+    # check if we have explicit podman provider env. var. added
+    if (-not [string]::IsNullOrWhiteSpace($podmanProvider)) {
+        Write-Host "Settings CONTAINERS_MACHINE_PROVIDER: $podmanProvider"
+        Set-Item -Path "env:CONTAINERS_MACHINE_PROVIDER" -Value $podmanProvider
+        $global:scriptEnvVars += "CONTAINERS_MACHINE_PROVIDER"
+        $global:envVarDefs += "CONTAINERS_MACHINE_PROVIDER=$podmanProvider"
+    }
 }
 
 # download and execute arbitrary script on the host
@@ -213,10 +222,20 @@ function Load-Secrets() {
 
 function Collect-Logs($folder) {
     mkdir -p "$workingDir\$resultsFolder\$folder"
+    $source="$workingDir\$folder"
     $target="$workingDir\$resultsFolder\$folder"
+    write-host "Collecting the results from: $source, to: $target"
     if ($extTests -eq "1") {
-        write-host "Clean up models files..."
-        Get-ChildItem -Path "$workingDir\$folder" *.gguf -Recurse | foreach { Remove-Item -Path $_.FullName }
+        write-host "Removing possible models from working directories"
+        Get-ChildItem -Path "$source" -Name "*.gguf" -Recurse | Remove-Item -Force
+        write-host "Removing possible VM files from **/images/*"
+        Get-ChildItem -Path "$source" -Name "images" -Directory -Recurse | Remove-Item -Recurse -Force
+        write-host "Removing plugins from pd home dir - contains node_modules"
+        Get-ChildItem -Path "$source" -Name "plugins" -Directory -Recurse | Remove-Item -Recurse -Force
+        write-host "Removing safe-storage from pd home dir"
+        Get-ChildItem -Path "$source" -Name "safe-storage" -Directory -Recurse | Remove-Item -Recurse -Force
+        write-host "Removing browser resources from test artifacts"
+        Get-ChildItem -Path "$source\browser\resources" -Directory -Recurse | Remove-Item -Recurse -Force
     }
     write-host "Collecting the results into: " $target
     Copy-Exists $workingDir\$folder\stdout.txt $target
@@ -228,9 +247,13 @@ function Collect-Logs($folder) {
     Copy-Exists $workingDir\$folder\tests\playwright\tests\output\* $target
     Copy-Exists $workingDir\$folder\tests\playwright\tests\playwright\output\* $target
     # reduce the size of the artifacts
-    if (Test-Path "$target\traces\raw") {
-        write-host "Removing raw playwright trace files"
-        rm -r "$target\traces\raw"
+    if (Test-Path "$target\traces") {
+        write-host "Removing raw playwright trace files: .\**\traces\raw"
+        Get-ChildItem -Path "$target" -Name "raw" -Directory -Recurse | Where-Object { $_.Parent.Name -eq "traces" } | Remove-Item -Recurse -Force
+        if ($saveTraces -eq "0") {
+            write-host "Removing all traces from test artifacts, mainly due capacity reasons"
+            Remove-Item -Path "$target\traces" -Recurse -Force
+        }
     }
 }
 
@@ -552,13 +575,6 @@ if (-not (Command-Exists "podman")) {
 
 # Test podman version installed
 podman -v
-
-# Set custom podman provider (wsl vs. hyperv)
-if (-not [string]::IsNullOrWhiteSpace($podmanProvider)) {
-    Write-Host "Setting CONTAINERS_MACHINE_PROVIDER: '$podmanProvider'"
-    Set-Item -Path "env:CONTAINERS_MACHINE_PROVIDER" -Value $podmanProvider
-    $global:scriptEnvVars += "CONTAINERS_MACHINE_PROVIDER"
-}
 
 # If the provider is hyperv, we need to allow podman in defender's firewall
 if (-not [string]::IsNullOrWhiteSpace($podmanProvider) -and $podmanProvider -eq "hyperv") {

@@ -181,8 +181,8 @@ function clone_checkout() {
 }
 
 function copy_exists() {
-    source=$1
-    target=$2
+    local source=$1
+    local target=$2
     if [ -e $source ]; then
         echo "Copying files from $source to $target"
         cp -r $source $target
@@ -192,12 +192,13 @@ function copy_exists() {
 }
 
 function collect_logs() {
-    folder="$1"
+    local folder="$1"
     mkdir -p "$workingDir/$resultsFolder/$folder"
-    target="$workingDir/$resultsFolder/$folder"
-    echo "Collecting the results into: " $target
+    local source="$workingDir/$folder"
+    local target="$workingDir/$resultsFolder/$folder"
+    echo "Collecting the results from: $source, to: " $target
     # copy all junit xml files into target and rename them by the folder the were in
-    junits=$(find $workingDir/$folder -name "junit*.xml")
+    local junits=$(find $source -name "junit*.xml")
     echo "Found Junit files: $junits"
     for junit in $junits; do
         target_path="$workingDir/$resultsFolder/junit-$folder.xml"
@@ -206,17 +207,25 @@ function collect_logs() {
     done
     if (( extTests == 1 )); then
         echo "Removing possible models from working directories"
-        rm -rf "$workingDir/$folder/**/*.gguf"
+        rm -rf "$source/**/*.gguf"
+        echo "Removing possible VM files from **/images/*"
+        rm -rf "$source/**/images/*"
+
+        echo "Removing browser resources from test artifacts"
+        rm -rf "$source/**/browser/resources"
     fi
+
+    echo "Removing plugins from pd home dir - contains node_modules"
+    rm -rf "$source/**/plugins/*"
     
-    copy_exists "$workingDir/$folder/output.log" $target
-    copy_exists "$workingDir/$folder/tests/output/" $target
-    copy_exists "$workingDir/$folder/tests/playwright/output/" $target
-    copy_exists "$workingDir/$folder/tests/playwright/tests/output/" $target
+    copy_exists "$source/output.log" $target
+    copy_exists "$source/tests/output/" $target
+    copy_exists "$source/tests/playwright/output/" $target
+    copy_exists "$source/tests/playwright/tests/output/" $target
     # reduce the size of the artifacts
     if [ -d "$target/traces" ]; then
-        echo "Removing raw playwright trace files"
-        rm -r "$target/traces/raw"
+        echo "Removing raw playwright trace files: ./**/traces/raw"
+        rm -r ./**/traces/raw
         if (( saveTraces == 0)); then
             echo "Removing all traces from test artifacts, mainly due capacity reasons"
             rm -rf "$target/traces"
