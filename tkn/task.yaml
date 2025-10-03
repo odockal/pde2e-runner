@@ -178,6 +178,7 @@ spec:
         if [[ -n "$(params.podman-provider)" ]]; then
           cmd="$cmd -podmanProvider $(params.podman-provider) "
         fi
+        cmd="$cmd -saveTraces $(params.save-traces) "
       fi
       if [[ $(params.os) == "darwin" ]]; then
         cmd="${TARGET_FOLDER}/runner.sh "
