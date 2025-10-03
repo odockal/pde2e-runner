@@ -14,11 +14,11 @@ param(
     [Parameter(HelpMessage = 'Podman Desktop Repository name')]
     [string]$repo = "podman-desktop",
     [Parameter(HelpMessage = 'Extension repo')]
-    [string]$extRepo = "podman-desktop-redhat-account-ext",
+    [string]$extRepo = "",
     [Parameter(HelpMessage = 'Extension Fork')]
-    [string]$extFork = "redhat-developer",
+    [string]$extFork = "",
     [Parameter(HelpMessage = 'Extension Branch')]
-    [string]$extBranch = "main",
+    [string]$extBranch = "",
     [Parameter(HelpMessage = 'Npm Target to run')]
     [string]$npmTarget = "test:e2e",
     [Parameter(HelpMessage = 'Run Extension Tests - 0/false')]
