@@ -56,13 +56,13 @@ spec:
     default: 'main'
   - name: ext-repo
     description: Podman Desktop Extension repo name
-    default: 'extension-bootc'
+    default: "''"
   - name: ext-fork
     description: Podman Desktop extension repo fork
-    default: 'podman-desktop'
+    default: "''"
   - name: ext-branch
     description: Podman Desktop repository branch or tag to checkout
-    default: 'main'
+    default: "''"
   - name: ext-tests
     description: Whether run the E2E tests from the extension
     default: '0'
@@ -163,9 +163,15 @@ spec:
         cmd="$cmd -fork $(params.fork) "
         cmd="$cmd -branch $(params.branch) "
         cmd="$cmd -extTests $(params.ext-tests) "
-        cmd="$cmd -extRepo $(params.ext-repo) "
-        cmd="$cmd -extFork $(params.ext-fork) "
-        cmd="$cmd -extBranch $(params.ext-branch) "
+        if [[ -n "$(params.ext-repo)" ]]; then
+          cmd="$cmd -extRepo $(params.ext-repo) "
+        fi
+        if [[ -n "$(params.ext-fork)" ]]; then
+          cmd="$cmd -extFork $(params.ext-fork) "
+        fi
+        if [[ -n "$(params.ext-branch)" ]]; then
+          cmd="$cmd -extBranch $(params.ext-branch) "
+        fi
         cmd="$cmd -envVars $(params.env-vars) "
         cmd="$cmd -secretFile $(params.secret-file) "
         cmd="$cmd -npmTarget $(params.npm-target) "
@@ -174,7 +180,9 @@ spec:
         cmd="$cmd -start $(params.podman-start) "
         cmd="$cmd -rootful $(params.podman-rootful) "
         cmd="$cmd -userNetworking $(params.podman-user-networking) "
-        cmd="$cmd -scriptPaths $(params.script-paths) "
+        if [[ -n "$(params.script-paths)" ]]; then
+          cmd="$cmd -scriptPaths $(params.script-paths) "
+        fi
         if [[ -n "$(params.podman-provider)" ]]; then
           cmd="$cmd -podmanProvider $(params.podman-provider) "
         fi
