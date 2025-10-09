@@ -207,25 +207,32 @@ function collect_logs() {
     done
     if (( extTests == 1 )); then
         echo "Removing possible models from working directories"
-        rm -rf "$source/**/*.gguf"
+        ls $source/**/output/**/*.gguf
+        rm -rf $source/**/output/**/*.gguf
         echo "Removing possible VM files from **/images/*"
-        rm -rf "$source/**/images/*"
-
-        echo "Removing browser resources from test artifacts"
-        rm -rf "$source/**/browser/resources"
+        ls $source/**/output/**/images/
+        rm -rf $source/**/output/**/images/*
     fi
 
-    echo "Removing plugins from pd home dir - contains node_modules"
-    rm -rf "$source/**/plugins/*"
+    ls $source/**/output/**/plugins/*
+    rm -rf $source/**/output/**/plugins/*
     
     copy_exists "$source/output.log" $target
     copy_exists "$source/tests/output/" $target
     copy_exists "$source/tests/playwright/output/" $target
     copy_exists "$source/tests/playwright/tests/output/" $target
     # reduce the size of the artifacts
+    # remove resources
+    echo "Removing resources artifacts"
+    rm -rf $target/resources
+    rm -rf $target/*/resources
+    rm -rf $target/**/resources
+    echo "Removing plugins from pd home dir - contains node_modules"
+    rm -rf $target/**/plugins/*
+    # remove raw traces
     if [ -d "$target/traces" ]; then
         echo "Removing raw playwright trace files: ./**/traces/raw"
-        rm -r ./**/traces/raw
+        rm -r "$target/traces/raw"
         if (( saveTraces == 0)); then
             echo "Removing all traces from test artifacts, mainly due capacity reasons"
             rm -rf "$target/traces"
@@ -437,11 +444,8 @@ else
     cd "$workingDir/podman-desktop"
     echo "Installing dependencies and storing pnpm run output in: $testsOutputLog"
     pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
-    if [[ "$extTests" -eq 0 ]]; then
-        echo "Running the e2e playwright tests using target: $npmTarget, binary path, if any: $podmanDesktopBinary"
-        pnpm "$npmTarget" 2>&1 | tee -a $testsOutputLog
-        collect_logs "podman-desktop"
-    else
+    # extract since tests should be run afte execute scripts
+    if [[ "$extTests" -eq 1 ]]; then
         echo "Building podman-desktop for extension e2e tests"
         pnpm test:e2e:build 2>&1 | tee -a $testsOutputLog
     fi
@@ -471,6 +475,10 @@ if (( extTests == 1 )); then
     pnpm $npmTarget 2>&1 | tee -a $testsOutputLog
     ## Collect results
     collect_logs $extRepo
+else 
+    echo "Running the e2e playwright tests using target: $npmTarget, binary path, if any: $podmanDesktopBinary"
+    pnpm "$npmTarget" 2>&1 | tee -a $testsOutputLog
+    collect_logs "podman-desktop"
 fi
 
 # Cleaning up, env vars - secrets
