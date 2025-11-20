@@ -358,12 +358,27 @@ else
 fi
 
 if (( cleanMachine == 1 )); then
-    echo "Cleaning up the podman machines before running the tests"
+    echo "Cleaning up the podman machines before running the tests..."
+    echo "Check running podman processes..."
+    if [ "$(pgrep podman | wc -l)" -gt 0 ]; then
+        echo "Found running podman processes, terminating them..."
+        pkill podman
+    fi
+    if [ "$(pgrep crc | wc -l)" -gt 0 ]; then
+        if [ -e "~/.crc/bin/crc" ]; then
+            echo "Stopping and deleting crc..."
+            ~/.crc/bin/crc stop
+            ~/.crc/bin/crc delete -f
+        fi
+        echo "Found running crc processes, terminating them..."
+        pkill crc
+    fi
     # Reset Podman Machine
     podman machine reset -f
     # remove old podman system connections from user space
     rm -rf ~/.config/containers/podman-connections.json*
     rm -rf ~/.config/containers/podman
+    echo "Cleanup finshed..."
 fi
 
 # get running Podman Desktop instances and terminate them
