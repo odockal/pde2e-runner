@@ -233,12 +233,16 @@ spec:
       . entrypoint.sh "${cmd}"
 
       # Results
+      echo "Storing duration result..."
       echo -n "${SECONDS}" | tee $(results.duration.path)
       
       # Move all results to qe-path
+      echo "Copying results '${OUTPUT_FOLDER}/${TARGET_RESULTS}' to output folder"
       mv ${OUTPUT_FOLDER}/${TARGET_RESULTS}/* ${OUTPUT_FOLDER}
+      echo "Removal of the target results"
       rm -rf ${OUTPUT_FOLDER}/${TARGET_RESULTS}
 
+      echo "Print out the content of the output folder with results"
       ls -R ${OUTPUT_FOLDER}
       echo -n "$(basename $(ls ${OUTPUT_FOLDER}/junit*.xml))" | tee $(results.junit-name.path)
       echo -n "$(ls ${OUTPUT_FOLDER}/junit*.xml)" | tee $(results.junit-path.path)
