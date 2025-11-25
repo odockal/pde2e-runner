@@ -102,7 +102,7 @@ function Load-Variables() {
     Write-Host "Input String: '$envVars'"
 
     write-host "Setting default env. var.: CI=true"
-    Set-Item -Path "env:CI" -Value $true
+    Set-Item -Path "env:CI" -Value "true"
     $global:scriptEnvVars += "CI"
     $global:envVarDefs += 'CI=true'
 
