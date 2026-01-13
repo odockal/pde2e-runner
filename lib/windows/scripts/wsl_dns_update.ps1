@@ -1,21 +1,28 @@
-# verify DNS resolution is not working
-wsl curl -I https://ghcr.io 
+Write-Host "---Verifying if DNS resolution is working or not---"
+$result = wsl -e curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 https://ghcr.io 2>$null
+if ($result -match "^[23]\d{2}$") { # 200-299 = Success; 300-399 = Redirect
+    Write-Host "DNS resolution is working (HTTP $result), no fix needed"
+    exit 0
+}
+Write-Host "DNS resolution failed (HTTP $result), applying fix"
 
-# show current configuration status
-wsl sudo cat /etc/wsl.conf
+Write-Host "---Current configuration status---"
+wsl -e sudo cat /etc/wsl.conf
 
-# change default dns behavior
-wsl sudo sh -c 'cat <<EOT > /etc/wsl.conf  
-[network]   
-generateResolvConf = false 
-EOT' 
+Write-Host "---Changing default DNS behavior---"
+# appends a [network] entry if it doesn't exist already
+wsl -e sudo bash -c "grep -q '\[network\]' /etc/wsl.conf 2>/dev/null || printf '\n[network]\n' >> /etc/wsl.conf; grep -q 'generateResolvConf' /etc/wsl.conf || echo 'generateResolvConf = false' >> /etc/wsl.conf" 
+wsl -e sudo cat /etc/wsl.conf 
 
-# show configuration changes
-wsl sudo cat /etc/wsl.conf 
+Write-Host "---Specifying a more reliable DNS server---"
+wsl -e sudo rm -f /etc/resolv.conf 
+wsl -e sudo bash -c "echo 'nameserver 8.8.8.8' > /etc/resolv.conf" 
+wsl -e sudo cat /etc/resolv.conf 
 
-# specify a more reliable DNS server
-wsl sudo rm -f /etc/resolv.conf 
-wsl sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf' 
-
-# verify DNS resolution should work now
-wsl curl -I https://ghcr.io 
+Write-Host "---Verifying if DNS resolution is working after the applied fix---"
+$result = wsl -e curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 https://ghcr.io 2>$null
+if ($result -match "^[23]\d{2}$") { # 200-299 = Success; 300-399 = Redirect
+    Write-Host "DNS resolution is working (HTTP $result), the fix worked"
+    exit 0
+}
+Write-Host "DNS resolution failed (HTTP $result), the fix did not work"
