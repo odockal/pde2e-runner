@@ -1,3 +1,16 @@
+Write-Host "---Checking WSL availability---"
+$wslStatus = wsl --status 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "WSL is not enabled or not properly installed, skipping DNS fix"
+    exit 0
+}
+$distros = wsl --list --quiet 2>$null
+if (-not $distros) {
+    Write-Host "No WSL distributions installed, skipping DNS fix"
+    exit 0
+}
+Write-Host "WSL is available with distributions: $($distros -join ', ')"
+
 Write-Host "---Verifying if DNS resolution is working or not---"
 $result = wsl -e curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 https://ghcr.io 2>$null
 if ($result -match "^[23]\d{2}$") { # 200-299 = Success; 300-399 = Redirect
