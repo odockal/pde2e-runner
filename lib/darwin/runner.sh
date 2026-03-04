@@ -197,14 +197,26 @@ function collect_logs() {
     local source="$workingDir/$folder"
     local target="$workingDir/$resultsFolder/$folder"
     echo "Collecting the results from: $source, to: " $target
-    # copy all junit xml files into target and rename them by the folder the were in
-    local junits=$(find $source -name "junit*.xml")
-    echo "Found Junit files: $junits"
-    for junit in $junits; do
+    
+    # Find all JUnit files
+    local -a junits
+    mapfile -t junits < <(find $source -name "junit*.xml")
+    local count=${#junits[@]}
+    
+    # Add the warning if accidental extras are found
+    if (( count > 1 )); then
+        echo "WARNING: Expected exactly one JUnit file, but found $count! Proceeding with the first one found."
+    fi
+    
+    # Grab the first one found
+    local junit="${junits[0]}"
+    
+    if [ -n "$junit" ]; then
+        echo "Found Junit file: $junit"
         target_path="$workingDir/$resultsFolder/junit-$folder.xml"
         echo "Copying $junit and renaming to $target_path"
         cp "$junit" $target_path
-    done
+    fi
     if (( extTests == 1 )); then
         echo "Removing possible models from working directories"
         ls $source/**/output/**/*.gguf
