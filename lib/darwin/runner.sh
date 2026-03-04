@@ -216,7 +216,10 @@ function collect_logs() {
         target_path="$workingDir/$resultsFolder/junit-$folder.xml"
         echo "Copying $junit and renaming to $target_path"
         cp "$junit" $target_path
+    else
+        echo "WARNING: No JUnit file found in $source"
     fi
+
     if (( extTests == 1 )); then
         echo "Removing possible models from working directories"
         ls $source/**/output/**/*.gguf

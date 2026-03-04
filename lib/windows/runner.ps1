@@ -242,6 +242,8 @@ function Collect-Logs($folder) {
         $target_path = "$workingDir\$resultsFolder\junit-$folder.xml"
         write-host "Copying $($junit.FullName) and renaming to $target_path"
         Copy-Item -Path $junit.FullName -Destination $target_path -Force
+    } else {
+        write-host "WARNING: No JUnit file found in $source"
     }
 
     if ($extTests -eq "1") {
