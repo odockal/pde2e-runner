@@ -225,6 +225,27 @@ function Collect-Logs($folder) {
     $source="$workingDir\$folder"
     $target="$workingDir\$resultsFolder\$folder"
     write-host "Collecting the results from: $source, to: $target"
+
+    # Find all JUnit files safely and force result into an array
+    $junits = @(Get-ChildItem -Path $source -Filter "junit*.xml" -Recurse)
+    $count = $junits.Count
+
+    # Add the warning if accidental extras are found
+    if ($count -gt 1) {
+        write-host "WARNING: Expected exactly one JUnit file, but found $count! Proceeding with the first one found."
+    }
+
+    # Grab the first one found
+    if ($count -gt 0) {
+        $junit = $junits[0]
+        write-host "Found Junit file: $($junit.FullName)"
+        $target_path = "$workingDir\$resultsFolder\junit-$folder.xml"
+        write-host "Copying $($junit.FullName) and renaming to $target_path"
+        Copy-Item -Path $junit.FullName -Destination $target_path -Force
+    } else {
+        write-host "WARNING: No JUnit file found in $source"
+    }
+
     if ($extTests -eq "1") {
         write-host "Removing possible models from working directories"
         Get-ChildItem -Path "$source" -Name "*.gguf" -Recurse | Remove-Item -Force
