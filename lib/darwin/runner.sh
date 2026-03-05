@@ -198,26 +198,27 @@ function collect_logs() {
     local target="$workingDir/$resultsFolder/$folder"
     echo "Collecting the results from: $source, to: " $target
     
-    # Find all JUnit files
-    local -a junits
-    mapfile -t junits < <(find $source -name "junit*.xml")
+    local junits=()
+    while IFS= read -r file; do
+        # Only add to array if the file string is not empty
+        [ -n "$file" ] && junits+=("$file")
+    done < <(find "$source" -type f -name "junit*.xml" 2>/dev/null)
+
     local count=${#junits[@]}
-    
-    # Add the warning if accidental extras are found
-    if (( count > 1 )); then
-        echo "WARNING: Expected exactly one JUnit file, but found $count! Proceeding with the first one found."
-    fi
-    
-    # Grab the first one found
-    local junit="${junits[0]}"
-    
-    if [ -n "$junit" ]; then
-        echo "Found Junit file: $junit"
-        target_path="$workingDir/$resultsFolder/junit-$folder.xml"
-        echo "Copying $junit and renaming to $target_path"
-        cp "$junit" $target_path
+
+    if [ "$count" -eq 0 ]; then
+        echo "WARNING: No JUnit file found anywhere in $source"
     else
-        echo "WARNING: No JUnit file found in $source"
+        if [ "$count" -gt 1 ]; then
+            echo "WARNING: Expected exactly one JUnit file, but found $count! Proceeding with the first one."
+        fi
+
+        local junit="${junits[0]}"
+        local target_path="$workingDir/$resultsFolder/junit-$folder.xml"
+
+        echo "Found Junit file: $junit"
+        echo "Copying $junit to $target_path"
+        cp "$junit" "$target_path"
     fi
 
     if (( extTests == 1 )); then
