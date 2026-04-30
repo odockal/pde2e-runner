@@ -199,6 +199,7 @@ spec:
       fi
       if [[ $(params.os) == "darwin" || $(params.os) == "rhel" ]]; then
         cmd="${TARGET_FOLDER}/runner.sh "
+        cmd="$cmd --os $(params.os) "
         cmd="$cmd --targetFolder ${TARGET_FOLDER} "
         cmd="$cmd --resultsFolder ${TARGET_RESULTS} "
         if [[ -n "$(params.pd-path)" ]]; then

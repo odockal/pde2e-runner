@@ -5,11 +5,9 @@ nodeVersion="v24.12.0"
 gitVersion="2.42.0"
 pnpmVersion="10"
 
-# Detect platform
-PLATFORM=$(uname -s)
-
 declare -a script_env_vars
 
+os=""
 pdUrl=""
 pdPath=""
 targetFolder=""
@@ -34,6 +32,7 @@ scriptPaths=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --os) os="$2"; shift ;;
         --pdUrl) pdUrl="$2"; shift ;;
         --pdPath) pdPath="$2"; shift ;;
         --targetFolder) targetFolder="$2"; shift ;;
@@ -259,7 +258,7 @@ function collect_logs() {
     fi
 }
 
-# Linux (RHEL) only: adopt display variables from the GNOME session
+# RHEL only: adopt display variables from the GNOME session
 # created by the separate display-setup task
 function setup_display() {
     export DISPLAY=:0
@@ -280,7 +279,12 @@ function setup_display() {
 }
 
 
-echo "Podman desktop E2E runner script is being run on ${PLATFORM}..."
+echo "Podman desktop E2E runner script is being run (os=${os})..."
+
+if [ -z "$os" ]; then
+    echo "Error: --os parameter is required (darwin, rhel)"
+    exit 1
+fi
 
 if [ -z "$targetFolder" ]; then
     echo "Error: targetFolder is required"
@@ -294,8 +298,8 @@ mkdir -p "$resultsFolder"
 workingDir=$(pwd)
 echo "Working location: $workingDir"
 
-# Linux (RHEL): redirect large caches off the small /home partition
-if [[ "$PLATFORM" == "Linux" ]]; then
+# RHEL: redirect large caches off the small /home partition
+if [[ "$os" == "rhel" ]]; then
     export PLAYWRIGHT_BROWSERS_PATH="$workingDir/.cache/ms-playwright"
     export PNPM_STORE_DIR="$workingDir/.pnpm-store"
     export XDG_CONFIG_HOME="$workingDir/.config"
@@ -329,34 +333,24 @@ fi
 
 # node installation
 if ! command -v node &> /dev/null; then
-    case "$PLATFORM" in
-        Darwin)
-            # architecture in [arm64, x86_64]
-            # node arch strings in [arm64, x64]
-            nodeArch=""
-            if [ "$architecture" == "x86_64" ]; then
-                nodeArch="x64"
-            elif [ "$architecture" == "arm64" ]; then
-                nodeArch="arm64"
-            else
-                echo "Error: Unsupported architecture $architecture"
-                exit 1
-            fi
-            nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-darwin-$nodeArch.tar.xz"
-            nodeDirName="node-$nodeVersion-darwin-$nodeArch"
-            ;;
-        Linux)
-            nodeArch="x64"
-            nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-linux-${nodeArch}.tar.xz"
-            nodeDirName="node-$nodeVersion-linux-${nodeArch}"
-            ;;
+    # architecture in [arm64, x86_64] -> node arch strings in [arm64, x64]
+    case "$architecture" in
+        x86_64) nodeArch="x64" ;;
+        arm64)  nodeArch="arm64" ;;
+        *)      echo "Error: Unsupported architecture $architecture"; exit 1 ;;
     esac
+    case "$os" in
+        darwin) nodeOsName="darwin" ;;
+        rhel)   nodeOsName="linux" ;;
+    esac
+    nodeDirName="node-$nodeVersion-${nodeOsName}-${nodeArch}"
+    nodeUrl="https://nodejs.org/download/release/$nodeVersion/${nodeDirName}.tar.xz"
 
     # Check if Node.js is already installed
     echo "$(ls $toolsInstallDir)"
     if [ ! -d "$toolsInstallDir/$nodeDirName" ]; then
         # Download and install Node.js
-        echo "Installing node $nodeVersion for $PLATFORM $nodeArch"
+        echo "Installing node $nodeVersion for $os $nodeArch"
         curl -o "$toolsInstallDir/node.tar.xz" "$nodeUrl"
         tar -xf "$toolsInstallDir/node.tar.xz" -C "$toolsInstallDir"
     fi
@@ -374,8 +368,8 @@ echo "Node.js Version: $(node -v)"
 echo "npm Version: $(npm -v)"
 
 if ! command -v git &> /dev/null; then
-    case "$PLATFORM" in
-        Darwin)
+    case "$os" in
+        darwin)
             # Check if Git is already installed
             if [ ! -d "$toolsInstallDir/git-$gitVersion" ]; then
                 # Download and install Git
@@ -389,7 +383,7 @@ if ! command -v git &> /dev/null; then
             fi
             export PATH="$PATH:$toolsInstallDir/git-$gitVersion/bin"
             ;;
-        Linux)
+        rhel)
             echo "Installing git via dnf..."
             sudo dnf install -y git
             ;;
@@ -399,8 +393,8 @@ fi
 # git verification
 git --version
 
-# Linux (RHEL): install Electron/Podman Desktop runtime dependencies
-if [[ "$PLATFORM" == "Linux" ]]; then
+# RHEL: install Electron/Podman Desktop runtime dependencies
+if [[ "$os" == "rhel" ]]; then
     echo "Installing Electron runtime dependencies..."
     sudo dnf install -y \
         atk \
@@ -427,9 +421,9 @@ fi
 
 # Install pnpm
 echo "Installing pnpm"
-case "$PLATFORM" in
-    Darwin) sudo npm install -g pnpm@$pnpmVersion ;;
-    Linux)  npm install -g pnpm@$pnpmVersion ;;
+case "$os" in
+    darwin) sudo npm install -g pnpm@$pnpmVersion ;;
+    rhel)   npm install -g pnpm@$pnpmVersion ;;
 esac
 echo "pnpm Version: $(pnpm --version)"
 
@@ -448,7 +442,7 @@ if ! command -v podman &> /dev/null; then
     fi
 else
     echo "Warning: Podman nor Podman Path is specified!"
-    if [[ "$PLATFORM" == "Linux" ]] && [ -n "$podmanPath" ]; then
+    if [[ "$os" == "rhel" ]] && [ -n "$podmanPath" ]; then
         export PATH="$podmanPath:$PATH"
     fi
     # exit 1;
@@ -463,8 +457,8 @@ if (( cleanMachine == 1 )); then
         echo "Found running podman processes, terminating them..."
         pkill podman 2>/dev/null || true
     fi
-    case "$PLATFORM" in
-        Darwin)
+    case "$os" in
+        darwin)
             if [ "$(pgrep crc | wc -l)" -gt 0 ]; then
                 if [ -e "~/.crc/bin/crc" ]; then
                     echo "Stopping and deleting crc..."
@@ -477,7 +471,7 @@ if (( cleanMachine == 1 )); then
             # Reset Podman Machine
             podman machine reset -f
             ;;
-        Linux)
+        rhel)
             podman system prune -f --volumes 2>/dev/null || true
             ;;
     esac
@@ -490,22 +484,22 @@ fi
 # get running Podman Desktop instances and terminate them
 exit_status=0
 echo "pid of running Podman Desktop instances:"
-case "$PLATFORM" in
-    Darwin) pgrep -f "Podman Desktop" || exit_status=$? ;;
-    Linux)  pgrep -x "podman-desktop" || exit_status=$? ;;
+case "$os" in
+    darwin) pgrep -f "Podman Desktop" || exit_status=$? ;;
+    rhel)   pgrep -x "podman-desktop" || exit_status=$? ;;
 esac
 if (( exit_status == 0 )); then
     echo "Podman Desktop is running, terminating..."
-    case "$PLATFORM" in
-        Darwin) kill -9 $(pgrep -f "Podman Desktop") ;;
-        Linux)  kill -9 $(pgrep -x "podman-desktop") ;;
+    case "$os" in
+        darwin) kill -9 $(pgrep -f "Podman Desktop") ;;
+        rhel)   kill -9 $(pgrep -x "podman-desktop") ;;
     esac
 else
     echo "No running Podman Desktop"
 fi
 
 # Configure Podman Machine
-if [[ "$PLATFORM" == "Darwin" ]] && (( initialize == 1 )); then
+if [[ "$os" == "darwin" ]] && (( initialize == 1 )); then
     flags=""
     if (( rootful == 1 )); then
         flags+="--rootful "
@@ -535,8 +529,8 @@ appPath=""
 if [ -z "$pdPath" ]; then
     if [ -n "$pdUrl" ]; then
         download_pd
-        case "$PLATFORM" in
-            Darwin)
+        case "$os" in
+            darwin)
                 dmgPath=$(realpath $(find . -name *podman-desktop*))
                 version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
                 hdiutil attach $dmgPath
@@ -549,7 +543,7 @@ if [ -z "$pdPath" ]; then
                 codesign --verify --deep --verbose=2 "$appPath"
                 podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
                 ;;
-            Linux)
+            rhel)
                 pkgFile=$(realpath $(find . -maxdepth 1 -name '*podman-desktop*' | head -1))
                 echo "Downloaded package: $pkgFile"
 
@@ -666,21 +660,21 @@ fi
 
 if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines"
-    case "$PLATFORM" in
-        Darwin) podman machine reset -f ;;
-        Linux)  podman system prune -f --volumes 2>/dev/null || true ;;
+    case "$os" in
+        darwin) podman machine reset -f ;;
+        rhel)   podman system prune -f --volumes 2>/dev/null || true ;;
     esac
 fi
 
-case "$PLATFORM" in
-    Darwin)
+case "$os" in
+    darwin)
         if [ -n "$podmanDesktopBinary" ]; then
             # removing installed app
             echo "Removing Podman Desktop app from /Applications"
             sudo rm -rf "$appPath"
         fi
         ;;
-    Linux)
+    rhel)
         if [ -n "$appPath" ]; then
             if [ "$appPath" = "rpm" ]; then
                 echo "Removing Podman Desktop RPM installation"
@@ -697,9 +691,9 @@ case "$PLATFORM" in
 esac
 
 # Remove binaries
-case "$PLATFORM" in
-    Darwin) binaries=("docker-compose" "kubectl" "kind" "minikube" "crc") ;;
-    Linux)  binaries=("docker-compose" "kubectl" "kind" "minikube") ;;
+case "$os" in
+    darwin) binaries=("docker-compose" "kubectl" "kind" "minikube" "crc") ;;
+    rhel)   binaries=("docker-compose" "kubectl" "kind" "minikube") ;;
 esac
 for binary in "${binaries[@]}";
 do
