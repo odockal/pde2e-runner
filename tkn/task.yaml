@@ -31,11 +31,14 @@ spec:
   - name: key
     description: key file name to connect to the provisioned machine within the workspace resources path   
   - name: os
-    description: type of platform per target host (windows, darwin)
+    description: type of platform per target host (windows, darwin, rhel)
     default: windows
   - name: arch
-    description: type of arch per target host for windows only amd64, for darwin amd64 or arm64 
+    description: type of arch per target host for windows only amd64, for darwin amd64 or arm64
     default: amd64
+  - name: target-folder
+    description: target folder on the remote host for runner assets and execution
+    default: pd-e2e
   - name: workspace-resources-path
     description: path on workspace to find resources to connect to the target machine
   # PDE2E Runner parameters
@@ -124,7 +127,7 @@ spec:
 
   steps:
   - name: e2e
-    image: quay.io/odockal/pde2e-runner:v$(params.image-version)-$(params.os)
+    image: quay.io/rh_ee_amisskii/pde2e-runner:v$(params.image-version)-$(params.os)
     # We do not have a strict control on versions (as so they can be override)
     # force here to pull everytime just in case it is overriden
     imagePullPolicy: Always
@@ -138,7 +141,7 @@ spec:
       TARGET_HOST_USERNAME=$(params.username)
       TARGET_HOST_KEY_PATH=$(workspaces.pipelines-data.path)/$(params.workspace-resources-path)/$(params.key)
       chmod 600 ${TARGET_HOST_KEY_PATH}
-      TARGET_FOLDER=pd-e2e
+      TARGET_FOLDER=$(params.target-folder)
       TARGET_RESULTS=$(params.results-folder)
       TARGET_CLEANUP=$(params.target-cleanup)
       OUTPUT_FOLDER=$(workspaces.pipelines-data.path)/$(params.workspace-resources-path)/$(params.workspace-qe-subpath)
@@ -194,7 +197,7 @@ spec:
         fi
         cmd="$cmd -saveTraces $(params.save-traces) "
       fi
-      if [[ $(params.os) == "darwin" ]]; then
+      if [[ $(params.os) == "darwin" || $(params.os) == "rhel" ]]; then
         cmd="${TARGET_FOLDER}/runner.sh "
         cmd="$cmd --targetFolder ${TARGET_FOLDER} "
         cmd="$cmd --resultsFolder ${TARGET_RESULTS} "
@@ -234,8 +237,16 @@ spec:
           cmd="$cmd --scriptPaths $(params.script-paths) "
         fi
       fi
-      
+
       echo "Composed Command to be executed: '${cmd}'"
+
+      # RHEL: pre-create target folder with correct ownership (requires sudo)
+      if [[ "$(params.os)" == "rhel" ]]; then
+        ssh -i ${TARGET_HOST_KEY_PATH} \
+          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          ${TARGET_HOST_USERNAME}@${TARGET_HOST} \
+          "sudo mkdir -p ${TARGET_FOLDER} && sudo chown ${TARGET_HOST_USERNAME}:${TARGET_HOST_USERNAME} ${TARGET_FOLDER}"
+      fi
 
       # Exec
       . entrypoint.sh "${cmd}"

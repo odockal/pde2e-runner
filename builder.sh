@@ -8,6 +8,10 @@ OS=darwin make oci-push
 OS=windows make oci-build
 OS=windows make oci-push
 
+# Build RHEL image
+OS=rhel make oci-build
+OS=rhel make oci-push
+
 # Build and push Tekton Task image
 make tkn-push
 

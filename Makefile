@@ -8,9 +8,11 @@ include tools/tools.mk
 
 # Build the container image
 .PHONY: oci-build
+ENTRYPOINT_OS ?= $(if $(filter rhel,$(OS)),linux,$(OS))
+
 oci-build:
 	$(info    Building the image: $(IMG)-$(OS))
-	${CONTAINER_MANAGER} build -t ${IMG}-${OS} -f Containerfile --build-arg=OS=${OS} .
+	${CONTAINER_MANAGER} build -t ${IMG}-${OS} -f Containerfile --build-arg=OS=${OS} --build-arg=ENTRYPOINT_OS=$(ENTRYPOINT_OS) .
 
 # Build the container image # requires user to be logged into a registry
 .PHONY: oci-push
