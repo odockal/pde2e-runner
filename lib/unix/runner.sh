@@ -5,6 +5,9 @@ nodeVersion="v24.12.0"
 gitVersion="2.42.0"
 pnpmVersion="10"
 
+# Detect platform
+PLATFORM=$(uname -s)
+
 declare -a script_env_vars
 
 pdUrl=""
@@ -59,7 +62,7 @@ done
 
 # Functions
 download_pd() {
-    echo "Downloading Podman Desktop dmg from $pdUrl"
+    echo "Downloading Podman Desktop from $pdUrl"
     curl -L -O "$pdUrl"
 }
 
@@ -86,7 +89,7 @@ function load_variables() {
                 newValue="${!name}"
                 script_env_vars+=("$name")
             else
-                echo "Invalid variable assignment: $variable"
+                echo "Invalid variable assignment: $var"
             fi
         done
     else
@@ -103,19 +106,19 @@ function load_variables() {
 function execute_scripts() {
     echo "Loading Paths passed into image"
     echo "ScriptPaths String: '$scriptPaths'"
-    
+
     # Check if the input string is not null or empty
     if [[ -n "$scriptPaths" ]]; then
         scripts_folder="$resourcesPath"
-        
+
         # Split the input using comma separator
         IFS=',' read -r -a paths <<< "$scriptPaths"
-        
+
         for path in "${paths[@]}"; do
             path=$(echo "$path" | xargs) # Trim whitespace
             echo "Processing $path"
             script_path="$scripts_folder/$path"
-            
+
             if [[ -f "$script_path" ]]; then
                 echo "Executing $script_path"
                 bash "$script_path"
@@ -151,7 +154,7 @@ function load_secrets() {
         else
             echo "Secret File path $secretFilePath does not exist"
         fi
-    else 
+    else
         echo "Secret file Parameter not set"
     fi
 }
@@ -186,7 +189,7 @@ function copy_exists() {
     if [ -e $source ]; then
         echo "Copying files from $source to $target"
         cp -r $source $target
-    else 
+    else
         echo "Path $source does not exist"
     fi
 }
@@ -197,7 +200,7 @@ function collect_logs() {
     local source="$workingDir/$folder"
     local target="$workingDir/$resultsFolder/$folder"
     echo "Collecting the results from: $source, to: " $target
-    
+
     local junits=()
     while IFS= read -r file; do
         # Only add to array if the file string is not empty
@@ -232,7 +235,7 @@ function collect_logs() {
 
     ls $source/**/output/**/plugins/*
     rm -rf $source/**/output/**/plugins/*
-    
+
     copy_exists "$source/output.log" $target
     copy_exists "$source/tests/output/" $target
     copy_exists "$source/tests/playwright/output/" $target
@@ -256,8 +259,28 @@ function collect_logs() {
     fi
 }
 
+# Linux (RHEL) only: adopt display variables from the GNOME session
+# created by the separate display-setup task
+function setup_display() {
+    export DISPLAY=:0
+    export GDK_BACKEND=x11
 
-echo "Podman desktop E2E runner script is being run..."
+    local uid xauth_file
+    uid=$(id -u)
+    xdpyinfo &>/dev/null || true
+    for i in $(seq 1 5); do
+        xauth_file=$(ls "/run/user/$uid"/.mutter-Xwaylandauth.* 2>/dev/null | head -1)
+        [[ -n "$xauth_file" ]] && break
+        sleep 1
+    done
+    [[ -n "$xauth_file" ]] && export XAUTHORITY="$xauth_file" \
+        || echo "WARNING: XAUTHORITY not found in /run/user/$uid"
+
+    echo "Display: DISPLAY=$DISPLAY GDK_BACKEND=$GDK_BACKEND XAUTHORITY=$XAUTHORITY"
+}
+
+
+echo "Podman desktop E2E runner script is being run on ${PLATFORM}..."
 
 if [ -z "$targetFolder" ]; then
     echo "Error: targetFolder is required"
@@ -270,6 +293,14 @@ echo "Create a resultsFolder in targetFolder: $resultsFolder"
 mkdir -p "$resultsFolder"
 workingDir=$(pwd)
 echo "Working location: $workingDir"
+
+# Linux (RHEL): redirect large caches off the small /home partition
+if [[ "$PLATFORM" == "Linux" ]]; then
+    export PLAYWRIGHT_BROWSERS_PATH="$workingDir/.cache/ms-playwright"
+    export PNPM_STORE_DIR="$workingDir/.pnpm-store"
+    export XDG_CONFIG_HOME="$workingDir/.config"
+    export XDG_DATA_HOME="$workingDir/.local/share"
+fi
 
 # Specify the user profile directory
 userProfile="$HOME"
@@ -298,33 +329,43 @@ fi
 
 # node installation
 if ! command -v node &> /dev/null; then
-    # architecture in [arm64, x86_64]
-    # node arch strings in [arm64, x64]
-    nodeArch=""
-    if [ "$architecture" == "x86_64" ]; then
-        nodeArch="x64"
-    elif [ "$architecture" == "arm64" ]; then
-        nodeArch="arm64"
-    else
-        echo "Error: Unsupported architecture $architecture"
-        exit 1
-    fi
-    nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-darwin-$nodeArch.tar.xz"
+    case "$PLATFORM" in
+        Darwin)
+            # architecture in [arm64, x86_64]
+            # node arch strings in [arm64, x64]
+            nodeArch=""
+            if [ "$architecture" == "x86_64" ]; then
+                nodeArch="x64"
+            elif [ "$architecture" == "arm64" ]; then
+                nodeArch="arm64"
+            else
+                echo "Error: Unsupported architecture $architecture"
+                exit 1
+            fi
+            nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-darwin-$nodeArch.tar.xz"
+            nodeDirName="node-$nodeVersion-darwin-$nodeArch"
+            ;;
+        Linux)
+            nodeArch="x64"
+            nodeUrl="https://nodejs.org/download/release/$nodeVersion/node-$nodeVersion-linux-${nodeArch}.tar.xz"
+            nodeDirName="node-$nodeVersion-linux-${nodeArch}"
+            ;;
+    esac
 
     # Check if Node.js is already installed
     echo "$(ls $toolsInstallDir)"
-    if [ ! -d "$toolsInstallDir/node-$nodeVersion-darwin-$nodeArch" ]; then
+    if [ ! -d "$toolsInstallDir/$nodeDirName" ]; then
         # Download and install Node.js
-        echo "Installing node $nodeVersion for $architecture architecture"
-        echo "curl -O $nodeUrl | tar -xJ -C $toolsInstallDir"
-        curl -o "$toolsInstallDir/node.tar.xz" "$nodeUrl" 
-        tar -xf $toolsInstallDir/node.tar.xz -C $toolsInstallDir
+        echo "Installing node $nodeVersion for $PLATFORM $nodeArch"
+        curl -o "$toolsInstallDir/node.tar.xz" "$nodeUrl"
+        tar -xf "$toolsInstallDir/node.tar.xz" -C "$toolsInstallDir"
     fi
-    if [ -d "$toolsInstallDir/node-$nodeVersion-darwin-${nodeArch}/bin" ]; then
+    if [ -d "$toolsInstallDir/$nodeDirName/bin" ]; then
         echo "Node Installation path found"
-        export PATH="$PATH:$toolsInstallDir/node-$nodeVersion-darwin-${nodeArch}/bin"
+        export PATH="$PATH:$toolsInstallDir/$nodeDirName/bin"
     else
         echo "Node installation path not found"
+        exit 1
     fi
 fi
 
@@ -333,26 +374,63 @@ echo "Node.js Version: $(node -v)"
 echo "npm Version: $(npm -v)"
 
 if ! command -v git &> /dev/null; then
-    # Check if Git is already installed
-    if [ ! -d "$toolsInstallDir/git-$gitVersion" ]; then
-        # Download and install Git
-        echo "Installing git $gitVersion"
-        gitUrl="https://github.com/git/git/archive/refs/tags/v$gitVersion.tar.gz"
-        mkdir -p "$toolsInstallDir/git-$gitVersion"
-        curl -O "$gitUrl" | tar -xz -C "$toolsInstallDir/git-$gitVersion" --strip-components 1
-        cd "$toolsInstallDir/git-$gitVersion" || exit
-        make prefix="$toolsInstallDir/git-$gitVersion" all
-        make prefix="$toolsInstallDir/git-$gitVersion" install
-    fi
-    export PATH="$PATH:$toolsInstallDir/git-$gitVersion/bin"
+    case "$PLATFORM" in
+        Darwin)
+            # Check if Git is already installed
+            if [ ! -d "$toolsInstallDir/git-$gitVersion" ]; then
+                # Download and install Git
+                echo "Installing git $gitVersion"
+                gitUrl="https://github.com/git/git/archive/refs/tags/v$gitVersion.tar.gz"
+                mkdir -p "$toolsInstallDir/git-$gitVersion"
+                curl -O "$gitUrl" | tar -xz -C "$toolsInstallDir/git-$gitVersion" --strip-components 1
+                cd "$toolsInstallDir/git-$gitVersion" || exit
+                make prefix="$toolsInstallDir/git-$gitVersion" all
+                make prefix="$toolsInstallDir/git-$gitVersion" install
+            fi
+            export PATH="$PATH:$toolsInstallDir/git-$gitVersion/bin"
+            ;;
+        Linux)
+            echo "Installing git via dnf..."
+            sudo dnf install -y git
+            ;;
+    esac
 fi
 
 # git verification
 git --version
 
+# Linux (RHEL): install Electron/Podman Desktop runtime dependencies
+if [[ "$PLATFORM" == "Linux" ]]; then
+    echo "Installing Electron runtime dependencies..."
+    sudo dnf install -y \
+        atk \
+        at-spi2-atk \
+        at-spi2-core \
+        alsa-lib \
+        cups-libs \
+        gtk3 \
+        libdrm \
+        libXcomposite \
+        libXdamage \
+        libXfixes \
+        libXrandr \
+        libXtst \
+        mesa-libgbm \
+        nss \
+        nspr \
+        pango \
+        xorg-x11-utils 2>/dev/null || true
+
+    # Adopt the display from the GNOME session created by the display-setup task
+    setup_display
+fi
+
 # Install pnpm
 echo "Installing pnpm"
-sudo npm install -g pnpm@$pnpmVersion
+case "$PLATFORM" in
+    Darwin) sudo npm install -g pnpm@$pnpmVersion ;;
+    Linux)  npm install -g pnpm@$pnpmVersion ;;
+esac
 echo "pnpm Version: $(pnpm --version)"
 
 # Setup Podman
@@ -361,7 +439,7 @@ if ! command -v podman &> /dev/null; then
         echo "Podman is not installed..."
         echo "Settings podman binary location '$podmanPath' to PATH"
         export PATH="$PATH:$podmanPath"
-    elif [ -d '/opt/podman/bin' ]; then   
+    elif [ -d '/opt/podman/bin' ]; then
         echo "Podman is installed in /opt/podman/bin..."
         export PATH="$PATH:/opt/podman/bin"
     else
@@ -370,46 +448,64 @@ if ! command -v podman &> /dev/null; then
     fi
 else
     echo "Warning: Podman nor Podman Path is specified!"
+    if [[ "$PLATFORM" == "Linux" ]] && [ -n "$podmanPath" ]; then
+        export PATH="$podmanPath:$PATH"
+    fi
     # exit 1;
 fi
+
+podman -v
 
 if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines before running the tests..."
     echo "Check running podman processes..."
     if [ "$(pgrep podman | wc -l)" -gt 0 ]; then
         echo "Found running podman processes, terminating them..."
-        pkill podman
+        pkill podman 2>/dev/null || true
     fi
-    if [ "$(pgrep crc | wc -l)" -gt 0 ]; then
-        if [ -e "~/.crc/bin/crc" ]; then
-            echo "Stopping and deleting crc..."
-            ~/.crc/bin/crc stop
-            ~/.crc/bin/crc delete -f
-        fi
-        echo "Found running crc processes, terminating them..."
-        pkill crc
-    fi
-    # Reset Podman Machine
-    podman machine reset -f
+    case "$PLATFORM" in
+        Darwin)
+            if [ "$(pgrep crc | wc -l)" -gt 0 ]; then
+                if [ -e "~/.crc/bin/crc" ]; then
+                    echo "Stopping and deleting crc..."
+                    ~/.crc/bin/crc stop
+                    ~/.crc/bin/crc delete -f
+                fi
+                echo "Found running crc processes, terminating them..."
+                pkill crc
+            fi
+            # Reset Podman Machine
+            podman machine reset -f
+            ;;
+        Linux)
+            podman system prune -f --volumes 2>/dev/null || true
+            ;;
+    esac
     # remove old podman system connections from user space
-    rm -rf ~/.config/containers/podman-connections.json*
-    rm -rf ~/.config/containers/podman
-    echo "Cleanup finshed..."
+    rm -rf ~/.config/containers/podman-connections.json* 2>/dev/null || true
+    rm -rf ~/.config/containers/podman 2>/dev/null || true
+    echo "Cleanup finished..."
 fi
 
 # get running Podman Desktop instances and terminate them
 exit_status=0
 echo "pid of running Podman Desktop instances:"
-pgrep -f "Podman Desktop" || exit_status=$?
+case "$PLATFORM" in
+    Darwin) pgrep -f "Podman Desktop" || exit_status=$? ;;
+    Linux)  pgrep -x "podman-desktop" || exit_status=$? ;;
+esac
 if (( exit_status == 0 )); then
     echo "Podman Desktop is running, terminating..."
-    kill -9 $(pgrep -f "Podman Desktop")
+    case "$PLATFORM" in
+        Darwin) kill -9 $(pgrep -f "Podman Desktop") ;;
+        Linux)  kill -9 $(pgrep -x "podman-desktop") ;;
+    esac
 else
     echo "No running Podman Desktop"
 fi
 
 # Configure Podman Machine
-if (( initialize == 1 )); then
+if [[ "$PLATFORM" == "Darwin" ]] && (( initialize == 1 )); then
     flags=""
     if (( rootful == 1 )); then
         flags+="--rootful "
@@ -437,20 +533,65 @@ podmanDesktopBinary=""
 appPath=""
 
 if [ -z "$pdPath" ]; then
-    if [ -n "$pdUrl" ]; then    
+    if [ -n "$pdUrl" ]; then
         download_pd
-        dmgPath=$(realpath $(find . -name *podman-desktop*))
-        version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-        hdiutil attach $dmgPath
-        pdVolumePath=$(find /Volumes -name "*Podman Desktop $version*" -maxdepth 1)
-        echo "PD Volume path: $pdVolumePath"
-        sudo cp -R "$pdVolumePath/Podman Desktop.app" /Applications
-        hdiutil detach "$pdVolumePath"
-        # codesign the extracted app
-        appPath="/Applications/Podman Desktop.app"
-        sudo codesign --force --deep --sign - "$appPath"
-        codesign --verify --deep --verbose=2 "$appPath"
-        podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
+        case "$PLATFORM" in
+            Darwin)
+                dmgPath=$(realpath $(find . -name *podman-desktop*))
+                version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+                hdiutil attach $dmgPath
+                pdVolumePath=$(find /Volumes -name "*Podman Desktop $version*" -maxdepth 1)
+                echo "PD Volume path: $pdVolumePath"
+                sudo cp -R "$pdVolumePath/Podman Desktop.app" /Applications
+                hdiutil detach "$pdVolumePath"
+                appPath="/Applications/Podman Desktop.app"
+                sudo codesign --force --deep --sign - "$appPath"
+                codesign --verify --deep --verbose=2 "$appPath"
+                podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
+                ;;
+            Linux)
+                pkgFile=$(realpath $(find . -maxdepth 1 -name '*podman-desktop*' | head -1))
+                echo "Downloaded package: $pkgFile"
+
+                if [[ "$pkgFile" == *.tar.gz ]]; then
+                    echo "Extracting Podman Desktop tar.gz..."
+                    mkdir -p "$workingDir/podman-desktop-app"
+                    tar -xzf "$pkgFile" -C "$workingDir/podman-desktop-app"
+                    podmanDesktopBinary=$(find "$workingDir/podman-desktop-app" \
+                        -maxdepth 2 -name 'podman-desktop' -type f 2>/dev/null | head -1)
+                    if [ -z "$podmanDesktopBinary" ]; then
+                        podmanDesktopBinary=$(find "$workingDir/podman-desktop-app" \
+                            -maxdepth 1 -type f -executable 2>/dev/null | head -1)
+                    fi
+                    appPath="$workingDir/podman-desktop-app"
+
+                elif [[ "$pkgFile" == *.AppImage ]]; then
+                    echo "Using Podman Desktop AppImage..."
+                    sudo dnf install -y fuse 2>/dev/null || true
+                    chmod +x "$pkgFile"
+                    podmanDesktopBinary="$pkgFile"
+                    appPath="$pkgFile"
+
+                elif [[ "$pkgFile" == *.rpm ]]; then
+                    echo "Installing Podman Desktop RPM: $pkgFile"
+                    sudo dnf install -y "$pkgFile"
+                    podmanDesktopBinary=$(which podman-desktop 2>/dev/null \
+                        || find /usr -name 'podman-desktop' -type f 2>/dev/null | head -1)
+                    appPath="rpm"
+
+                else
+                    echo "Error: Unknown Podman Desktop package format: $pkgFile"
+                    exit 1
+                fi
+
+                if [ -z "$podmanDesktopBinary" ]; then
+                    echo "Error: Could not determine Podman Desktop binary path after extraction"
+                    exit 1
+                fi
+                echo "Podman Desktop binary: $podmanDesktopBinary"
+                chmod +x "$podmanDesktopBinary" 2>/dev/null || true
+                ;;
+        esac
     fi
 else
     podmanDesktopBinary="$pdPath"
@@ -466,6 +607,7 @@ fi
 
 export CI=true
 testsOutputLog="$workingDir/$resultsFolder/tests.log"
+
 # Checkout Podman Desktop only if necessary
 if [[ "$extTests" -eq 1 ]] && [ -n "$podmanDesktopBinary" ] ; then
     echo "Running ext. tests and podman Desktop binary is specified, skipping checkout for podman-desktop"
@@ -475,7 +617,7 @@ else
     cd "$workingDir/podman-desktop"
     echo "Installing dependencies and storing pnpm run output in: $testsOutputLog"
     pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
-    # extract since tests should be run afte execute scripts
+    # extract since tests should be run after execute scripts
     if [[ "$extTests" -eq 1 ]]; then
         echo "Building podman-desktop for extension e2e tests"
         pnpm test:e2e:build 2>&1 | tee -a $testsOutputLog
@@ -500,13 +642,13 @@ if (( extTests == 1 )); then
     fi
     pnpm add -D @podman-desktop/tests-playwright@next
     cd "$workingDir/$extRepo"
-    echo "Installing dependencies of $extRrepo"
+    echo "Installing dependencies of $extRepo"
     pnpm install --frozen-lockfile 2>&1 | tee -a $testsOutputLog
     echo "Running the e2e playwright tests using target: $npmTarget"
     pnpm $npmTarget 2>&1 | tee -a $testsOutputLog
     ## Collect results
     collect_logs $extRepo
-else 
+else
     echo "Running the e2e playwright tests using target: $npmTarget, binary path, if any: $podmanDesktopBinary"
     pnpm "$npmTarget" 2>&1 | tee -a $testsOutputLog
     collect_logs "podman-desktop"
@@ -524,20 +666,44 @@ fi
 
 if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines"
-    podman machine reset -f
+    case "$PLATFORM" in
+        Darwin) podman machine reset -f ;;
+        Linux)  podman system prune -f --volumes 2>/dev/null || true ;;
+    esac
 fi
 
-if [ -n "$podmanDesktopBinary" ]; then
-    # removing installed app
-    echo "Removing Podman Desktop app from /Applications"
-    sudo rm -rf "$appPath"
-fi
+case "$PLATFORM" in
+    Darwin)
+        if [ -n "$podmanDesktopBinary" ]; then
+            # removing installed app
+            echo "Removing Podman Desktop app from /Applications"
+            sudo rm -rf "$appPath"
+        fi
+        ;;
+    Linux)
+        if [ -n "$appPath" ]; then
+            if [ "$appPath" = "rpm" ]; then
+                echo "Removing Podman Desktop RPM installation"
+                sudo dnf remove -y podman-desktop 2>/dev/null || true
+            elif [ -d "$appPath" ]; then
+                echo "Removing extracted Podman Desktop: $appPath"
+                rm -rf "$appPath"
+            elif [ -f "$appPath" ]; then
+                echo "Removing Podman Desktop AppImage: $appPath"
+                rm -f "$appPath"
+            fi
+        fi
+        ;;
+esac
 
 # Remove binaries
-binaries=("docker-compose" "kubectl" "kind" "minikube" "crc")
+case "$PLATFORM" in
+    Darwin) binaries=("docker-compose" "kubectl" "kind" "minikube" "crc") ;;
+    Linux)  binaries=("docker-compose" "kubectl" "kind" "minikube") ;;
+esac
 for binary in "${binaries[@]}";
 do
-    binaryPath=$(which "$binary")
+    binaryPath=$(which "$binary" 2>/dev/null)
     if [ -f "$binaryPath" ]; then
         echo "Removing $binary binary file"
         sudo rm "$binaryPath"

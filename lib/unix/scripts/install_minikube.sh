@@ -2,14 +2,16 @@
 set -e
 
 echo "Installing minikube..."
-if [ "$(uname -m)" = "arm64" ]; then
-    URL="https://github.com/kubernetes/minikube/releases/latest/download/minikube-darwin-arm64"
-elif [ "$(uname -m)" = "x86_64" ]; then
-    URL="https://github.com/kubernetes/minikube/releases/latest/download/minikube-darwin-amd64"
-else
-    echo "Unsupported architecture: $(uname -m)"
-    exit 1
-fi
+
+PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$ARCH" in
+    arm64|aarch64) ARCH="arm64" ;;
+    x86_64)        ARCH="amd64" ;;
+    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+
+URL="https://github.com/kubernetes/minikube/releases/latest/download/minikube-${PLATFORM}-${ARCH}"
 
 echo "Downloading minikube from $URL"
 if [ -n "$GITHUB_TOKEN" ]; then

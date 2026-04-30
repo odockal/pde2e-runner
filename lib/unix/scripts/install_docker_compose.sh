@@ -4,15 +4,15 @@ set -e
 echo "Installing docker-compose..."
 DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
 
-# Install docker-compose based on the arch
-if [ $(uname -m) = arm64 ]; then
-    URL="https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-darwin-aarch64"
-elif [ $(uname -m) = x86_64 ]; then
-    URL="https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-darwin-x86_64"
-else
-    echo "Unsupported architecture: $(uname -m)"
-    exit 1
-fi
+PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$ARCH" in
+    arm64|aarch64) ARCH="aarch64" ;;
+    x86_64)        ARCH="x86_64" ;;
+    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+
+URL="https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-${PLATFORM}-${ARCH}"
 
 echo "Downloading docker-compose from $URL"
 if [ -n "$GITHUB_TOKEN" ]; then
