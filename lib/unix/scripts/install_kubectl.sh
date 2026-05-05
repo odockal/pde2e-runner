@@ -3,16 +3,13 @@ set -e
 
 echo "Installing kubectl..."
 KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
-
+# Install kubectl based on the arch
 PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-case "$ARCH" in
-    arm64|aarch64) ARCH="arm64" ;;
-    x86_64)        ARCH="amd64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-esac
-
-curl -Lo ./kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${PLATFORM}/${ARCH}/kubectl"
+if [ $(uname -m) = arm64 ] || [ $(uname -m) = aarch64 ]; then
+    curl -Lo ./kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${PLATFORM}/arm64/kubectl"
+elif [ $(uname -m) = x86_64 ]; then
+    curl -Lo ./kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${PLATFORM}/amd64/kubectl"
+fi
 
 chmod +x ./kubectl
 sudo mv ./kubectl /usr/local/bin/kubectl

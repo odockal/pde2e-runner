@@ -334,15 +334,19 @@ fi
 # node installation
 if ! command -v node &> /dev/null; then
     # architecture in [arm64, x86_64] -> node arch strings in [arm64, x64]
-    case "$architecture" in
-        x86_64) nodeArch="x64" ;;
-        arm64)  nodeArch="arm64" ;;
-        *)      echo "Error: Unsupported architecture $architecture"; exit 1 ;;
-    esac
-    case "$os" in
-        darwin) nodeOsName="darwin" ;;
-        rhel)   nodeOsName="linux" ;;
-    esac
+    if [ "$architecture" == "x86_64" ]; then
+        nodeArch="x64"
+    elif [ "$architecture" == "arm64" ]; then
+        nodeArch="arm64"
+    else
+        echo "Error: Unsupported architecture $architecture"
+        exit 1
+    fi
+    if [ "$os" == "darwin" ]; then
+        nodeOsName="darwin"
+    elif [ "$os" == "rhel" ]; then
+        nodeOsName="linux"
+    fi
     nodeDirName="node-$nodeVersion-${nodeOsName}-${nodeArch}"
     nodeUrl="https://nodejs.org/download/release/$nodeVersion/${nodeDirName}.tar.xz"
 
@@ -368,26 +372,23 @@ echo "Node.js Version: $(node -v)"
 echo "npm Version: $(npm -v)"
 
 if ! command -v git &> /dev/null; then
-    case "$os" in
-        darwin)
-            # Check if Git is already installed
-            if [ ! -d "$toolsInstallDir/git-$gitVersion" ]; then
-                # Download and install Git
-                echo "Installing git $gitVersion"
-                gitUrl="https://github.com/git/git/archive/refs/tags/v$gitVersion.tar.gz"
-                mkdir -p "$toolsInstallDir/git-$gitVersion"
-                curl -O "$gitUrl" | tar -xz -C "$toolsInstallDir/git-$gitVersion" --strip-components 1
-                cd "$toolsInstallDir/git-$gitVersion" || exit
-                make prefix="$toolsInstallDir/git-$gitVersion" all
-                make prefix="$toolsInstallDir/git-$gitVersion" install
-            fi
-            export PATH="$PATH:$toolsInstallDir/git-$gitVersion/bin"
-            ;;
-        rhel)
-            echo "Installing git via dnf..."
-            sudo dnf install -y git
-            ;;
-    esac
+    if [[ "$os" == "darwin" ]]; then
+        # Check if Git is already installed
+        if [ ! -d "$toolsInstallDir/git-$gitVersion" ]; then
+            # Download and install Git
+            echo "Installing git $gitVersion"
+            gitUrl="https://github.com/git/git/archive/refs/tags/v$gitVersion.tar.gz"
+            mkdir -p "$toolsInstallDir/git-$gitVersion"
+            curl -O "$gitUrl" | tar -xz -C "$toolsInstallDir/git-$gitVersion" --strip-components 1
+            cd "$toolsInstallDir/git-$gitVersion" || exit
+            make prefix="$toolsInstallDir/git-$gitVersion" all
+            make prefix="$toolsInstallDir/git-$gitVersion" install
+        fi
+        export PATH="$PATH:$toolsInstallDir/git-$gitVersion/bin"
+    elif [[ "$os" == "rhel" ]]; then
+        echo "Installing git via dnf..."
+        sudo dnf install -y git
+    fi
 fi
 
 # git verification
@@ -421,10 +422,11 @@ fi
 
 # Install pnpm
 echo "Installing pnpm"
-case "$os" in
-    darwin) sudo npm install -g pnpm@$pnpmVersion ;;
-    rhel)   npm install -g pnpm@$pnpmVersion ;;
-esac
+if [[ "$os" == "darwin" ]]; then
+    sudo npm install -g pnpm@$pnpmVersion
+elif [[ "$os" == "rhel" ]]; then
+    npm install -g pnpm@$pnpmVersion
+fi
 echo "pnpm Version: $(pnpm --version)"
 
 # Setup Podman
@@ -457,24 +459,21 @@ if (( cleanMachine == 1 )); then
         echo "Found running podman processes, terminating them..."
         pkill podman 2>/dev/null || true
     fi
-    case "$os" in
-        darwin)
-            if [ "$(pgrep crc | wc -l)" -gt 0 ]; then
-                if [ -e "~/.crc/bin/crc" ]; then
-                    echo "Stopping and deleting crc..."
-                    ~/.crc/bin/crc stop
-                    ~/.crc/bin/crc delete -f
-                fi
-                echo "Found running crc processes, terminating them..."
-                pkill crc
+    if [[ "$os" == "darwin" ]]; then
+        if [ "$(pgrep crc | wc -l)" -gt 0 ]; then
+            if [ -e "~/.crc/bin/crc" ]; then
+                echo "Stopping and deleting crc..."
+                ~/.crc/bin/crc stop
+                ~/.crc/bin/crc delete -f
             fi
-            # Reset Podman Machine
-            podman machine reset -f
-            ;;
-        rhel)
-            podman system prune -f --volumes 2>/dev/null || true
-            ;;
-    esac
+            echo "Found running crc processes, terminating them..."
+            pkill crc
+        fi
+        # Reset Podman Machine
+        podman machine reset -f
+    elif [[ "$os" == "rhel" ]]; then
+        podman system prune -f --volumes 2>/dev/null || true
+    fi
     # remove old podman system connections from user space
     rm -rf ~/.config/containers/podman-connections.json* 2>/dev/null || true
     rm -rf ~/.config/containers/podman 2>/dev/null || true
@@ -484,16 +483,18 @@ fi
 # get running Podman Desktop instances and terminate them
 exit_status=0
 echo "pid of running Podman Desktop instances:"
-case "$os" in
-    darwin) pgrep -f "Podman Desktop" || exit_status=$? ;;
-    rhel)   pgrep -x "podman-desktop" || exit_status=$? ;;
-esac
+if [[ "$os" == "darwin" ]]; then
+    pgrep -f "Podman Desktop" || exit_status=$?
+elif [[ "$os" == "rhel" ]]; then
+    pgrep -x "podman-desktop" || exit_status=$?
+fi
 if (( exit_status == 0 )); then
     echo "Podman Desktop is running, terminating..."
-    case "$os" in
-        darwin) kill -9 $(pgrep -f "Podman Desktop") ;;
-        rhel)   kill -9 $(pgrep -x "podman-desktop") ;;
-    esac
+    if [[ "$os" == "darwin" ]]; then
+        kill -9 $(pgrep -f "Podman Desktop")
+    elif [[ "$os" == "rhel" ]]; then
+        kill -9 $(pgrep -x "podman-desktop")
+    fi
 else
     echo "No running Podman Desktop"
 fi
@@ -529,63 +530,60 @@ appPath=""
 if [ -z "$pdPath" ]; then
     if [ -n "$pdUrl" ]; then
         download_pd
-        case "$os" in
-            darwin)
-                dmgPath=$(realpath $(find . -name *podman-desktop*))
-                version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-                hdiutil attach $dmgPath
-                pdVolumePath=$(find /Volumes -name "*Podman Desktop $version*" -maxdepth 1)
-                echo "PD Volume path: $pdVolumePath"
-                sudo cp -R "$pdVolumePath/Podman Desktop.app" /Applications
-                hdiutil detach "$pdVolumePath"
-                appPath="/Applications/Podman Desktop.app"
-                sudo codesign --force --deep --sign - "$appPath"
-                codesign --verify --deep --verbose=2 "$appPath"
-                podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
-                ;;
-            rhel)
-                pkgFile=$(realpath $(find . -maxdepth 1 -name '*podman-desktop*' | head -1))
-                echo "Downloaded package: $pkgFile"
+        if [[ "$os" == "darwin" ]]; then
+            dmgPath=$(realpath $(find . -name *podman-desktop*))
+            version=$(echo $dmgPath | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            hdiutil attach $dmgPath
+            pdVolumePath=$(find /Volumes -name "*Podman Desktop $version*" -maxdepth 1)
+            echo "PD Volume path: $pdVolumePath"
+            sudo cp -R "$pdVolumePath/Podman Desktop.app" /Applications
+            hdiutil detach "$pdVolumePath"
+            appPath="/Applications/Podman Desktop.app"
+            sudo codesign --force --deep --sign - "$appPath"
+            codesign --verify --deep --verbose=2 "$appPath"
+            podmanDesktopBinary="$appPath/Contents/MacOS/Podman Desktop"
+        elif [[ "$os" == "rhel" ]]; then
+            pkgFile=$(realpath $(find . -maxdepth 1 -name '*podman-desktop*' | head -1))
+            echo "Downloaded package: $pkgFile"
 
-                if [[ "$pkgFile" == *.tar.gz ]]; then
-                    echo "Extracting Podman Desktop tar.gz..."
-                    mkdir -p "$workingDir/podman-desktop-app"
-                    tar -xzf "$pkgFile" -C "$workingDir/podman-desktop-app"
-                    podmanDesktopBinary=$(find "$workingDir/podman-desktop-app" \
-                        -maxdepth 2 -name 'podman-desktop' -type f 2>/dev/null | head -1)
-                    if [ -z "$podmanDesktopBinary" ]; then
-                        podmanDesktopBinary=$(find "$workingDir/podman-desktop-app" \
-                            -maxdepth 1 -type f -executable 2>/dev/null | head -1)
-                    fi
-                    appPath="$workingDir/podman-desktop-app"
-
-                elif [[ "$pkgFile" == *.AppImage ]]; then
-                    echo "Using Podman Desktop AppImage..."
-                    sudo dnf install -y fuse 2>/dev/null || true
-                    chmod +x "$pkgFile"
-                    podmanDesktopBinary="$pkgFile"
-                    appPath="$pkgFile"
-
-                elif [[ "$pkgFile" == *.rpm ]]; then
-                    echo "Installing Podman Desktop RPM: $pkgFile"
-                    sudo dnf install -y "$pkgFile"
-                    podmanDesktopBinary=$(which podman-desktop 2>/dev/null \
-                        || find /usr -name 'podman-desktop' -type f 2>/dev/null | head -1)
-                    appPath="rpm"
-
-                else
-                    echo "Error: Unknown Podman Desktop package format: $pkgFile"
-                    exit 1
-                fi
-
+            if [[ "$pkgFile" == *.tar.gz ]]; then
+                echo "Extracting Podman Desktop tar.gz..."
+                mkdir -p "$workingDir/podman-desktop-app"
+                tar -xzf "$pkgFile" -C "$workingDir/podman-desktop-app"
+                podmanDesktopBinary=$(find "$workingDir/podman-desktop-app" \
+                    -maxdepth 2 -name 'podman-desktop' -type f 2>/dev/null | head -1)
                 if [ -z "$podmanDesktopBinary" ]; then
-                    echo "Error: Could not determine Podman Desktop binary path after extraction"
-                    exit 1
+                    podmanDesktopBinary=$(find "$workingDir/podman-desktop-app" \
+                        -maxdepth 1 -type f -executable 2>/dev/null | head -1)
                 fi
-                echo "Podman Desktop binary: $podmanDesktopBinary"
-                chmod +x "$podmanDesktopBinary" 2>/dev/null || true
-                ;;
-        esac
+                appPath="$workingDir/podman-desktop-app"
+
+            elif [[ "$pkgFile" == *.AppImage ]]; then
+                echo "Using Podman Desktop AppImage..."
+                sudo dnf install -y fuse 2>/dev/null || true
+                chmod +x "$pkgFile"
+                podmanDesktopBinary="$pkgFile"
+                appPath="$pkgFile"
+
+            elif [[ "$pkgFile" == *.rpm ]]; then
+                echo "Installing Podman Desktop RPM: $pkgFile"
+                sudo dnf install -y "$pkgFile"
+                podmanDesktopBinary=$(which podman-desktop 2>/dev/null \
+                    || find /usr -name 'podman-desktop' -type f 2>/dev/null | head -1)
+                appPath="rpm"
+
+            else
+                echo "Error: Unknown Podman Desktop package format: $pkgFile"
+                exit 1
+            fi
+
+            if [ -z "$podmanDesktopBinary" ]; then
+                echo "Error: Could not determine Podman Desktop binary path after extraction"
+                exit 1
+            fi
+            echo "Podman Desktop binary: $podmanDesktopBinary"
+            chmod +x "$podmanDesktopBinary" 2>/dev/null || true
+        fi
     fi
 else
     podmanDesktopBinary="$pdPath"
@@ -660,41 +658,40 @@ fi
 
 if (( cleanMachine == 1 )); then
     echo "Cleaning up the podman machines"
-    case "$os" in
-        darwin) podman machine reset -f ;;
-        rhel)   podman system prune -f --volumes 2>/dev/null || true ;;
-    esac
+    if [[ "$os" == "darwin" ]]; then
+        podman machine reset -f
+    elif [[ "$os" == "rhel" ]]; then
+        podman system prune -f --volumes 2>/dev/null || true
+    fi
 fi
 
-case "$os" in
-    darwin)
-        if [ -n "$podmanDesktopBinary" ]; then
-            # removing installed app
-            echo "Removing Podman Desktop app from /Applications"
-            sudo rm -rf "$appPath"
+if [[ "$os" == "darwin" ]]; then
+    if [ -n "$podmanDesktopBinary" ]; then
+        # removing installed app
+        echo "Removing Podman Desktop app from /Applications"
+        sudo rm -rf "$appPath"
+    fi
+elif [[ "$os" == "rhel" ]]; then
+    if [ -n "$appPath" ]; then
+        if [ "$appPath" = "rpm" ]; then
+            echo "Removing Podman Desktop RPM installation"
+            sudo dnf remove -y podman-desktop 2>/dev/null || true
+        elif [ -d "$appPath" ]; then
+            echo "Removing extracted Podman Desktop: $appPath"
+            rm -rf "$appPath"
+        elif [ -f "$appPath" ]; then
+            echo "Removing Podman Desktop AppImage: $appPath"
+            rm -f "$appPath"
         fi
-        ;;
-    rhel)
-        if [ -n "$appPath" ]; then
-            if [ "$appPath" = "rpm" ]; then
-                echo "Removing Podman Desktop RPM installation"
-                sudo dnf remove -y podman-desktop 2>/dev/null || true
-            elif [ -d "$appPath" ]; then
-                echo "Removing extracted Podman Desktop: $appPath"
-                rm -rf "$appPath"
-            elif [ -f "$appPath" ]; then
-                echo "Removing Podman Desktop AppImage: $appPath"
-                rm -f "$appPath"
-            fi
-        fi
-        ;;
-esac
+    fi
+fi
 
 # Remove binaries
-case "$os" in
-    darwin) binaries=("docker-compose" "kubectl" "kind" "minikube" "crc") ;;
-    rhel)   binaries=("docker-compose" "kubectl" "kind" "minikube") ;;
-esac
+if [[ "$os" == "darwin" ]]; then
+    binaries=("docker-compose" "kubectl" "kind" "minikube" "crc")
+elif [[ "$os" == "rhel" ]]; then
+    binaries=("docker-compose" "kubectl" "kind" "minikube")
+fi
 for binary in "${binaries[@]}";
 do
     binaryPath=$(which "$binary" 2>/dev/null)
