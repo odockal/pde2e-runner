@@ -108,7 +108,7 @@ function execute_scripts() {
 
     # Check if the input string is not null or empty
     if [[ -n "$scriptPaths" ]]; then
-        scripts_folder="$resourcesPath"
+        scripts_folder="$resourcesPath/scripts"
 
         # Split the input using comma separator
         IFS=',' read -r -a paths <<< "$scriptPaths"
