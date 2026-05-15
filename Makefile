@@ -1,4 +1,4 @@
-VERSION ?= 0.0.3
+VERSION ?= 0.0.4
 CONTAINER_MANAGER ?= podman
 IMG ?= quay.io/odockal/pde2e-runner:v${VERSION}
 TKN_IMG ?= quay.io/odockal/pde2e-runner-tkn:v${VERSION}
@@ -8,7 +8,6 @@ include tools/tools.mk
 
 # Build the container image
 .PHONY: oci-build
-ENTRYPOINT_OS ?= $(if $(filter rhel,$(OS)),linux,$(OS))
 
 oci-build:
 	$(info    Building the image: $(IMG)-$(OS))
