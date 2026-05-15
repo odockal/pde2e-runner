@@ -8,7 +8,7 @@ FROM base AS os-darwin
 COPY /lib/darwin/ ${ASSETS_FOLDER}/
 COPY /lib/unix/scripts/ ${ASSETS_FOLDER}/scripts/
 
-FROM base AS os-rhel
+FROM base AS os-linux
 COPY /lib/rhel/ ${ASSETS_FOLDER}/
 COPY /lib/unix/scripts/ ${ASSETS_FOLDER}/scripts/
 
