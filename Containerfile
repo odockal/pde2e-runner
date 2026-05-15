@@ -1,7 +1,7 @@
 ARG OS
 
 FROM quay.io/rhqp/deliverest:v0.0.7 AS base
-LABEL org.opencontainers.image.authors="Ondrej Dockal<odockal@redhat.com>"
+LABEL org.opencontainers.image.authors="Ondrej Dockal<odockal@redhat.com> Anton Misskii<amisskii@redhat.com"
 ENV ASSETS_FOLDER=/opt/pde2e-runner
 
 FROM base AS os-darwin
